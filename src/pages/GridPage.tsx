@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { Responsive, WidthProvider } from 'react-grid-layout';
+import { ShaderGradientCanvas, ShaderGradient } from '@shadergradient/react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -36,6 +37,7 @@ const GridPage: React.FC = () => {
   const [query, setQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [hoveredWidget, setHoveredWidget] = useState<string | null>(null);
+  const [selectedWidget, setSelectedWidget] = useState<string | null>(null);
   const [activeWidgets, setActiveWidgets] = useState<string[]>([
     'safety', 'budget', 'student', 'transport', 'reviews', 'amenities', 'photos'
   ]);
@@ -70,15 +72,28 @@ const GridPage: React.FC = () => {
     ],
   };
 
-  const handleSearch = () => {
+  // Memoized handlers to prevent unnecessary re-renders
+  const handleSearch = useCallback(() => {
     if (!query.trim()) return;
     setIsSearching(true);
     setTimeout(() => setIsSearching(false), 2000);
-  };
+  }, [query]);
 
-  const handleDelete = (widgetId: string) => {
+  const handleDelete = useCallback((widgetId: string) => {
     setActiveWidgets(prev => prev.filter(id => id !== widgetId));
-  };
+    setSelectedWidget(null);
+  }, []);
+
+  const handleWidgetClick = useCallback((widgetId: string) => {
+    setSelectedWidget(widgetId);
+  }, []);
+
+  const handleCanvasClick = useCallback((e: React.MouseEvent) => {
+    // Only deselect if clicking directly on canvas background
+    if ((e.target as HTMLElement).classList.contains('canvas-background')) {
+      setSelectedWidget(null);
+    }
+  }, []);
 
   const widgets: Record<string, WidgetData> = {
     safety: {
@@ -222,10 +237,41 @@ const GridPage: React.FC = () => {
     },
   };
 
+  // Memoize widgets to prevent re-creation on every render
+  const memoizedWidgets = useMemo(() => widgets, []);
+  const memoizedActiveWidgets = useMemo(
+    () => Object.values(memoizedWidgets).filter(w => activeWidgets.includes(w.id)),
+    [memoizedWidgets, activeWidgets]
+  );
+
   return (
     <div className="min-h-screen relative overflow-hidden">
-      {/* Soft gradient background (not beige) */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50"></div>
+      {/* ShaderGradient Background */}
+      <div className="absolute inset-0">
+        <ShaderGradientCanvas
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+          }}
+        >
+          <ShaderGradient
+            control="query"
+            urlString="https://www.shadergradient.co/customize?animate=on&axesHelper=off&bgColor1=%23000000&bgColor2=%23000000&brightness=1.1&cAzimuthAngle=180&cDistance=3.9&cPolarAngle=90&cameraZoom=1&color1=%23dcffdb&color2=%2388ff85&color3=%2320d3a8&destination=onCanvas&embedMode=off&envPreset=city&format=gif&fov=40&frameRate=10&gizmoHelper=hide&grain=off&lightType=3d&pixelDensity=2.1&positionX=-1.4&positionY=0&positionZ=0&range=disabled&rangeEnd=40&rangeStart=0&reflection=0.1&rotationX=0&rotationY=10&rotationZ=50&shader=defaults&type=waterPlane&uAmplitude=0&uDensity=2.1&uFrequency=5.5&uSpeed=0.3&uStrength=5.3&uTime=0&wireframe=false"
+          />
+        </ShaderGradientCanvas>
+      </div>
+
+      {/* Dotted grid overlay */}
+      <div 
+        className="absolute inset-0 opacity-30 pointer-events-none"
+        style={{
+          backgroundImage: `radial-gradient(circle, rgba(34, 197, 94, 0.4) 1px, transparent 1px)`,
+          backgroundSize: '24px 24px',
+        }}
+      ></div>
 
       {/* Fixed floating search bar */}
       <div className="fixed top-6 left-1/2 transform -translate-x-1/2 z-50 w-full max-w-2xl px-4">
@@ -270,15 +316,15 @@ const GridPage: React.FC = () => {
           wheelDisabled: false
         }}
         panning={{ 
-          disabled: false,
-          velocityDisabled: false,
+          disabled: selectedWidget !== null,
+          velocityDisabled: true,
           lockAxisX: false,
           lockAxisY: false
         }}
         velocityAnimation={{
-          disabled: false,
-          sensitivity: 1,
-          animationTime: 400,
+          disabled: true,
+          sensitivity: 0.5,
+          animationTime: 200,
           animationType: 'easeOutQuart'
         }}
       >
@@ -302,42 +348,52 @@ const GridPage: React.FC = () => {
               </button>
               <button
                 onClick={() => resetTransform()}
-                className="p-3 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg hover:bg-white transition-colors shadow-md"
-                title="Reset view"
+                className="p-3 bg-green-600 hover:bg-green-700 backdrop-blur-sm border border-green-600 rounded-lg transition-colors shadow-md"
+                title="Return to center"
               >
-                <Maximize2 className="w-4 h-4 text-gray-700" />
+                <Maximize2 className="w-4 h-4 text-white" />
               </button>
             </div>
 
             {/* Canvas content */}
             <TransformComponent wrapperClass="!w-screen !h-screen">
-              <div className="p-24 min-h-screen min-w-[2000px]">
+              <div 
+                className="p-24 min-h-screen min-w-[2000px] canvas-background"
+                onClick={handleCanvasClick}
+              >
                 <ResponsiveGridLayout
                   className="layout"
                   layouts={layouts}
                   breakpoints={{ lg: 1200, md: 996, sm: 768 }}
                   cols={{ lg: 12, md: 10, sm: 6 }}
                   rowHeight={50}
-                  isDraggable={true}
-                  isResizable={true}
+                  isDraggable={selectedWidget === null}
+                  isResizable={selectedWidget !== null}
                   compactType="vertical"
                   preventCollision={false}
                   margin={[16, 16]}
                   resizeHandles={['s', 'w', 'e', 'n', 'sw', 'nw', 'se', 'ne']}
+                  draggableCancel=".react-resizable-handle"
                 >
-                  {Object.values(widgets)
-                    .filter(widget => activeWidgets.includes(widget.id))
-                    .map((widget) => (
+                  {memoizedActiveWidgets.map((widget) => (
                     <div 
                       key={widget.id}
                       onMouseEnter={() => setHoveredWidget(widget.id)}
                       onMouseLeave={() => setHoveredWidget(null)}
+                      onClick={() => handleWidgetClick(widget.id)}
                     >
-                      <Card className="bg-white border border-gray-200 h-full overflow-auto transition-all duration-200 hover:shadow-xl hover:shadow-gray-300/30 group relative">
+                      <Card className={`bg-white h-full flex flex-col overflow-hidden transition-all duration-200 hover:shadow-xl hover:shadow-gray-300/30 group relative ${
+                        selectedWidget === widget.id 
+                          ? 'border-2 border-green-500 shadow-lg shadow-green-200/50' 
+                          : 'border border-gray-200'
+                      }`}>
                         {/* Hover delete button (shadcn red) */}
                         {hoveredWidget === widget.id && (
                           <button
-                            onClick={() => handleDelete(widget.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(widget.id);
+                            }}
                             className="absolute top-2 right-2 z-20 p-1.5 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 transition-colors shadow-sm opacity-0 group-hover:opacity-100"
                             title="Remove widget"
                           >
@@ -345,23 +401,44 @@ const GridPage: React.FC = () => {
                           </button>
                         )}
 
-                        <div className="p-4 h-full flex flex-col">
-                          {/* Widget Header - bigger, at top */}
-                          <div className="flex items-center gap-2 mb-3">
-                            {widget.icon}
-                            <h3 className="text-base font-semibold text-gray-900">{widget.title}</h3>
+                        {/* Selection indicator */}
+                        {selectedWidget === widget.id && (
+                          <div className="absolute top-2 left-2 z-20 px-2 py-1 bg-green-500 text-white text-xs font-medium rounded-md shadow-sm">
+                            Selected
                           </div>
-                          
-                          {/* Widget Content - no bottom padding blocking */}
-                          <div className="flex-1 overflow-auto pb-2">
-                            {widget.loading ? (
-                              <div className="flex items-center justify-center h-full">
-                                <Loader2 className="w-6 h-6 animate-spin text-gray-300" />
-                              </div>
-                            ) : (
-                              widget.content
-                            )}
+                        )}
+
+                        {/* Widget Header - bigger, at top */}
+                        <div className="flex items-center gap-2 p-4 pb-2 flex-shrink-0">
+                          {widget.icon}
+                          <h3 className="text-base font-semibold text-gray-900">{widget.title}</h3>
+                        </div>
+                        
+                        {/* Widget Content - scrollable middle section */}
+                        <div className="flex-1 overflow-auto px-4">
+                          {widget.loading ? (
+                            <div className="flex items-center justify-center h-full">
+                              <Loader2 className="w-6 h-6 animate-spin text-gray-300" />
+                            </div>
+                          ) : (
+                            widget.content
+                          )}
+                        </div>
+
+                        {/* Bottom section - Sources/Citations */}
+                        <div className="flex items-center gap-1 px-4 py-2 border-t border-gray-100 bg-gray-50/50 flex-shrink-0">
+                          <div className="flex -space-x-1">
+                            <div className="w-5 h-5 rounded-full bg-green-100 border-2 border-white flex items-center justify-center" title="Source 1">
+                              <span className="text-[10px] font-medium text-green-700">1</span>
+                            </div>
+                            <div className="w-5 h-5 rounded-full bg-blue-100 border-2 border-white flex items-center justify-center" title="Source 2">
+                              <span className="text-[10px] font-medium text-blue-700">2</span>
+                            </div>
+                            <div className="w-5 h-5 rounded-full bg-purple-100 border-2 border-white flex items-center justify-center" title="Source 3">
+                              <span className="text-[10px] font-medium text-purple-700">3</span>
+                            </div>
                           </div>
+                          <span className="text-xs text-gray-500 ml-1">3 sources</span>
                         </div>
                       </Card>
                     </div>

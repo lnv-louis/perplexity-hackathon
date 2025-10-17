@@ -1,51 +1,70 @@
 
 # Housing Intelligence Grid - Production Ready MVP
 
-## 🎨 Current Design (v3 - Refined)
+## 🎨 Current Design (v3.2 - ShaderGradient & Selection States)
 
 ### Visual Design
-- **Background**: Soft blue → purple → pink gradient (not beige!)
-- **Widgets**: Pure white with gray borders, no icon backgrounds
+- **Background**: Animated 3D ShaderGradient with waterPlane effect (green theme)
+- **Grid Overlay**: Subtle dotted grid pattern for spatial awareness
+- **Widgets**: Pure white with smart borders (gray default, green when selected)
 - **Typography**: Headers are larger (text-base font-semibold) and positioned at top
-- **Zoom**: Smooth Canva-style zoom (0.1x to 8x with momentum)
-- **Delete**: Functional - widgets are removed and grid recompacts automatically
+- **Zoom**: Smooth Canva-style zoom (0.1x to 8x with controlled sensitivity)
+- **Selection**: Click widgets to select (green border + "Selected" badge)
 
 ### Key Features
+✅ **Animated ShaderGradient Background**
+- Dynamic 3D shader with smooth wave animations
+- Green color palette (#dcffdb, #88ff85, #20d3a8)
+- Runs continuously using Three.js canvas
+- Professional, eye-catching visual effect
+
+✅ **Smart Widget Selection**
+- Click any widget to select it (green 2px border appears)
+- "Selected" badge displays on active widget
+- Canvas panning disabled when widget selected
+- Prevents accidental canvas movement during editing
+- Click canvas background to deselect
+
+✅ **Performance Optimized**
+- useCallback for all event handlers
+- useMemo for widget lists and filtering
+- Smooth interactions without re-render lag
+- Efficient state management
+
 ✅ **Smooth Canva-Style Zoom**
 - Min: 0.1x, Max: 8x scale
-- Smooth wheel scrolling with momentum
+- Controlled sensitivity for precise movements
 - Double-click to zoom in
-- Velocity-based panning
+- Disabled when widget selected
 
 ✅ **Functional Widget Management**
 - Delete button works properly (removes from state)
 - Grid auto-recompacts when widget deleted
 - Widgets fall into place smoothly
-
-✅ **Improved Widget Layout**
-- Headers: Bigger text (text-base), no icon background, positioned at top
-- Content: Proper overflow handling, no bottom blocking
-- Icons: Direct rendering (no gray background boxes)
+- All 8 resize handles (corners + edges)
 
 ✅ **Professional Canvas**
-- Infinite pan in all directions
+- Infinite pan in all directions (when no widget selected)
 - Zoom controls (bottom-right)
 - Fixed translucent search bar (top-center)
-- Soft gradient background
+- Dotted grid overlay like Canva
+- "Return to Center" button
 
 ## 🎮 User Controls
 
 **Navigation:**
-- **Pan**: Click and drag anywhere
+- **Pan**: Click and drag anywhere (disabled when widget selected)
 - **Zoom**: Mouse wheel (smooth scrolling)
 - **Zoom In/Out**: Buttons (bottom-right) 
-- **Reset View**: ⤢ button
+- **Reset View**: ⤢ "Return to Center" button (green highlight)
 - **Double-click**: Quick zoom in
 
 **Widget Management:**
-- **Move**: Drag widget header
-- **Resize**: Drag any border or corner
+- **Select**: Click widget to select (green border + "Selected" badge)
+- **Move**: Drag widget header (disabled when any widget is selected)
+- **Resize**: Drag any border or corner (8 resize handles)
 - **Delete**: Hover → click red X (actually removes widget!)
+- **Deselect**: Click canvas background to deselect widget
 
 ## 🚀 Technical Implementation
 
@@ -114,20 +133,31 @@ bg-white/80 backdrop-blur-md
 - [ ] Parse API responses into widget data
 - [ ] Add new widget types dynamically
 - [ ] Persist layout preferences
+- [ ] Link source citations to URLs
 
-## ✅ Production Checklist
-- [x] Smooth Canva-style zoom
+## ✅ Production Checklist (v3.1)
+- [x] Smooth Canva-style zoom (0.1x to 8x)
 - [x] Functional delete with recompacting
-- [x] No icon backgrounds (clean white)
-- [x] Bigger headers at top
-- [x] No bottom content blocking
-- [x] Soft gradient (not beige)
+- [x] Green central theme
+- [x] Source citations in bottom section
+- [x] Return to center button (green)
+- [x] Background doesn't move while resizing
+- [x] Less sensitive panning
+- [x] No content blocking issues
 - [x] Professional widget styling
 - [ ] Backend API integration
 
+## 📚 Documentation
+
+- **README.md** (this file) - Overview and current design
+- **[SETUP.md](./SETUP.md)** - Technical setup and configuration
+- **[FEATURES.md](./FEATURES.md)** - User-facing features guide
+- **[CHANGELOG.md](./CHANGELOG.md)** - Version history and updates
+- **Report.md** - Initial analysis (don't modify)
+
 ---
 
-**Test**: `http://localhost:3001/housing`
+**Test**: `http://localhost:3000/housing`
 
 **Getting Started**
 
