@@ -36,6 +36,9 @@ const GridPage: React.FC = () => {
   const [query, setQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [hoveredWidget, setHoveredWidget] = useState<string | null>(null);
+  const [activeWidgets, setActiveWidgets] = useState<string[]>([
+    'safety', 'budget', 'student', 'transport', 'reviews', 'amenities', 'photos'
+  ]);
 
   const layouts = {
     lg: [
@@ -74,8 +77,7 @@ const GridPage: React.FC = () => {
   };
 
   const handleDelete = (widgetId: string) => {
-    console.log('Delete widget:', widgetId);
-    // TODO: Remove widget from layout
+    setActiveWidgets(prev => prev.filter(id => id !== widgetId));
   };
 
   const widgets: Record<string, WidgetData> = {
@@ -222,10 +224,10 @@ const GridPage: React.FC = () => {
 
   return (
     <div className="min-h-screen relative overflow-hidden">
-      {/* Lovable-style red-orange gradient background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-red-50 via-orange-50 to-amber-50"></div>
+      {/* Soft gradient background (not beige) */}
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50"></div>
 
-      {/* Fixed floating search bar (Lovable style) */}
+      {/* Fixed floating search bar */}
       <div className="fixed top-6 left-1/2 transform -translate-x-1/2 z-50 w-full max-w-2xl px-4">
         <div className="backdrop-blur-md bg-white/80 border border-gray-200 rounded-full shadow-lg px-4 py-2">
           <div className="flex gap-2 items-center">
@@ -254,28 +256,45 @@ const GridPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Infinite canvas with zoom/pan */}
+      {/* Infinite canvas with smooth Canva-style zoom */}
       <TransformWrapper
         initialScale={1}
-        minScale={0.5}
-        maxScale={3}
+        minScale={0.1}
+        maxScale={8}
         centerOnInit={true}
-        wheel={{ step: 0.1 }}
-        panning={{ velocityDisabled: true }}
+        limitToBounds={false}
+        doubleClick={{ disabled: false, mode: 'zoomIn', step: 0.7 }}
+        wheel={{ 
+          step: 0.05,
+          smoothStep: 0.005,
+          wheelDisabled: false
+        }}
+        panning={{ 
+          disabled: false,
+          velocityDisabled: false,
+          lockAxisX: false,
+          lockAxisY: false
+        }}
+        velocityAnimation={{
+          disabled: false,
+          sensitivity: 1,
+          animationTime: 400,
+          animationType: 'easeOutQuart'
+        }}
       >
         {({ zoomIn, zoomOut, resetTransform }) => (
           <>
             {/* Zoom controls */}
             <div className="fixed bottom-6 right-6 z-40 flex flex-col gap-2">
               <button
-                onClick={() => zoomIn()}
+                onClick={() => zoomIn(0.3)}
                 className="p-3 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg hover:bg-white transition-colors shadow-md"
                 title="Zoom in"
               >
                 <ZoomIn className="w-4 h-4 text-gray-700" />
               </button>
               <button
-                onClick={() => zoomOut()}
+                onClick={() => zoomOut(0.3)}
                 className="p-3 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg hover:bg-white transition-colors shadow-md"
                 title="Zoom out"
               >
@@ -306,13 +325,15 @@ const GridPage: React.FC = () => {
                   margin={[16, 16]}
                   resizeHandles={['s', 'w', 'e', 'n', 'sw', 'nw', 'se', 'ne']}
                 >
-                  {Object.values(widgets).map((widget) => (
+                  {Object.values(widgets)
+                    .filter(widget => activeWidgets.includes(widget.id))
+                    .map((widget) => (
                     <div 
                       key={widget.id}
                       onMouseEnter={() => setHoveredWidget(widget.id)}
                       onMouseLeave={() => setHoveredWidget(null)}
                     >
-                      <Card className="bg-white border border-gray-200 h-full overflow-hidden transition-all duration-200 hover:shadow-xl hover:shadow-gray-300/30 group relative">
+                      <Card className="bg-white border border-gray-200 h-full overflow-auto transition-all duration-200 hover:shadow-xl hover:shadow-gray-300/30 group relative">
                         {/* Hover delete button (shadcn red) */}
                         {hoveredWidget === widget.id && (
                           <button
@@ -324,17 +345,15 @@ const GridPage: React.FC = () => {
                           </button>
                         )}
 
-                        <div className="p-5 h-full flex flex-col">
-                          {/* Widget Header */}
-                          <div className="flex items-center gap-2 mb-4">
-                            <div className="p-1.5 bg-gray-50 rounded-md">
-                              {widget.icon}
-                            </div>
-                            <h3 className="text-sm font-medium text-gray-900">{widget.title}</h3>
+                        <div className="p-4 h-full flex flex-col">
+                          {/* Widget Header - bigger, at top */}
+                          <div className="flex items-center gap-2 mb-3">
+                            {widget.icon}
+                            <h3 className="text-base font-semibold text-gray-900">{widget.title}</h3>
                           </div>
                           
-                          {/* Widget Content */}
-                          <div className="flex-1 overflow-auto">
+                          {/* Widget Content - no bottom padding blocking */}
+                          <div className="flex-1 overflow-auto pb-2">
                             {widget.loading ? (
                               <div className="flex items-center justify-center h-full">
                                 <Loader2 className="w-6 h-6 animate-spin text-gray-300" />

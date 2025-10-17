@@ -37,8 +37,7 @@ yarn-error.log*
 # vercel
 .vercel
 
-# docs and photos
-/docs
+# photos
 /src/photos
 
 # typescript
