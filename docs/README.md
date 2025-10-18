@@ -1,70 +1,111 @@
 
 # Housing Intelligence Grid - Production Ready MVP
 
-## 🎨 Current Design (v3.2 - ShaderGradient & Selection States)
+## 🎨 Current Design (v3.4 - JSON-Based Widgets & Major UX Improvements)
 
 ### Visual Design
 - **Background**: Animated 3D ShaderGradient with waterPlane effect (green theme)
-- **Grid Overlay**: Subtle dotted grid pattern for spatial awareness
-- **Widgets**: Pure white with smart borders (gray default, green when selected)
-- **Typography**: Headers are larger (text-base font-semibold) and positioned at top
-- **Zoom**: Smooth Canva-style zoom (0.1x to 8x with controlled sensitivity)
-- **Selection**: Click widgets to select (green border + "Selected" badge)
+- **Grid Overlay**: **More visible** dotted grid pattern (50% opacity, 1.5px dots)
+- **Widgets**: Pure white with **enhanced hover shadows** (shadow-2xl)
+- **Typography**: **Larger headers** (text-lg bold) with **bigger icons** (w-5 h-5)
+- **Color Scheme**: **Global dark green** (#166534) for all CTAs and buttons
+- **Widget Structure**: Clean 3-part layout (Header | Body | Footer)
 
 ### Key Features
-✅ **Animated ShaderGradient Background**
-- Dynamic 3D shader with smooth wave animations
-- Green color palette (#dcffdb, #88ff85, #20d3a8)
-- Runs continuously using Three.js canvas
-- Professional, eye-catching visual effect
+✅ **JSON-Based Widget System**
+- Widgets loaded from `/data/widgets.json`
+- Smart height calculation based on content
+- Dynamic layout generation
+- Easy to extend and modify
 
-✅ **Smart Widget Selection**
-- Click any widget to select it (green 2px border appears)
-- "Selected" badge displays on active widget
-- Canvas panning disabled when widget selected
-- Prevents accidental canvas movement during editing
-- Click canvas background to deselect
+✅ **Widget Expand Feature**
+- Expand button next to delete button
+- Smooth animation to center popup
+- Full content view when expanded
+- Click outside or X to close
 
-✅ **Performance Optimized**
-- useCallback for all event handlers
-- useMemo for widget lists and filtering
-- Smooth interactions without re-render lag
-- Efficient state management
+✅ **Enhanced UX**
+- **Grid snapping**: Widgets snap to 24px grid
+- **No selection bugs**: Removed selection state entirely
+- **Always draggable**: Move widgets freely anytime
+- **Always resizable**: Resize from all 8 handles anytime
+- **Hover glow effect**: Green shadow on hover
+- **Clean interactions**: No more stuck states
 
-✅ **Smooth Canva-Style Zoom**
-- Min: 0.1x, Max: 8x scale
-- Controlled sensitivity for precise movements
-- Double-click to zoom in
-- Disabled when widget selected
+✅ **True Infinite Canvas**
+- No boundary limitations
+- Canvas extends to 10000px+ area
+- Widgets can be placed anywhere
+- Smooth zoom from 0.1x to 8x
 
-✅ **Functional Widget Management**
-- Delete button works properly (removes from state)
-- Grid auto-recompacts when widget deleted
-- Widgets fall into place smoothly
-- All 8 resize handles (corners + edges)
+✅ **Visual Improvements**
+- Widgets properly layered above dotted grid (z-20)
+- More visible dotted grid pattern (50% opacity)
+- Enhanced hover shadows (shadow-2xl)
+- Global dark green theme (#166534)
+- Next.js dev button hidden
 
-✅ **Professional Canvas**
-- Infinite pan in all directions (when no widget selected)
-- Zoom controls (bottom-right)
-- Fixed translucent search bar (top-center)
-- Dotted grid overlay like Canva
-- "Return to Center" button
+✅ **Widget Structure (3 Parts)**
+1. **Header**: Icon (green, w-5 h-5) + Title (text-lg bold) + Border bottom
+2. **Body**: Scrollable content area (flex-1, py-3) - always visible
+3. **Footer**: Compact source citations (py-1.5, text-[10px])
+
+✅ **Grid System: react-grid-layout**
+- Well-known, battle-tested library (v1.5.0)
+- Drag widgets anywhere
+- Resize from all 8 handles (corners + edges)
+- Auto-compact with vertical compaction
+- Responsive breakpoints (lg/md/sm)
+- Grid snapping enabled
+
+✅ **Backend Integration Ready**
+- JSON format in `/data/widgets.json`
+- Widget content structure documented in BACKEND_INTEGRATION.md
+- Progressive loading strategy planned
+- Perplexity API parallel prompting guide included
 
 ## 🎮 User Controls
 
 **Navigation:**
-- **Pan**: Click and drag anywhere (disabled when widget selected)
+- **Pan**: Click and drag anywhere on canvas background
 - **Zoom**: Mouse wheel (smooth scrolling)
 - **Zoom In/Out**: Buttons (bottom-right) 
-- **Reset View**: ⤢ "Return to Center" button (green highlight)
+- **Reset View**: ⤢ "Return to Center" button (dark green)
 - **Double-click**: Quick zoom in
+- **Deselect**: Click canvas background
 
 **Widget Management:**
 - **Select**: Click widget to select (green border + "Selected" badge)
-- **Move**: Drag widget header (disabled when any widget is selected)
-- **Resize**: Drag any border or corner (8 resize handles)
-- **Delete**: Hover → click red X (actually removes widget!)
-- **Deselect**: Click canvas background to deselect widget
+- **Move**: Drag widget to move (always enabled, move anywhere with space)
+- **Resize**: Drag any border or corner (8 resize handles, always enabled)
+- **Delete**: Hover → click red X button
+- **Enhanced Hover**: More visible shadow effect for better visual feedback
+
+## 🎯 Implementation Notes
+
+### Current State
+The GridPage.tsx is in transition to JSON-based widgets. Here are the key changes needed:
+
+**Completed:**
+- ✅ JSON data file created at `/data/widgets.json`
+- ✅ CSS updates (z-index, Next.js dev button hidden)
+- ✅ Grid snapping via react-grid-layout config
+- ✅ Documentation updated
+
+**In Progress:**
+- 🔄 GridPage.tsx refactor (removing old static widgets)
+- 🔄 Expand/collapse widget popup implementation
+- 🔄 Import path fixes
+- 🔄 Infinite canvas boundary removal
+
+### Key Implementation Details
+
+1. **JSON Widget Loading**: Import from `../../data/widgets.json`
+2. **Grid Snapping**: Set `compactType="vertical"` and margin `[16, 16]`
+3. **Z-Index Fix**: Applied in globals.css (widgets z-20, grid z-10)
+4. **Expand Button**: Use `<Maximize />` icon from lucide-react
+5. **No Selection State**: Removed `selectedWidget` state, hover effects only
+6. **Infinite Canvas**: Remove `limitToBounds` or set very large min-width/height
 
 ## 🚀 Technical Implementation
 

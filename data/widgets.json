@@ -1,0 +1,116 @@
+{
+  "widgets": [
+    {
+      "id": "safety",
+      "title": "Safety & Crime",
+      "iconType": "shield",
+      "content": {
+        "score": 8.2,
+        "rating": "Very Safe",
+        "metrics": [
+          "Low crime rate in past 12 months",
+          "Well-lit streets, active community",
+          "Regular police presence"
+        ]
+      },
+      "sources": [
+        { "id": 1, "name": "Metropolitan Police", "color": "green", "url": "https://www.met.police.uk/" },
+        { "id": 2, "name": "Crime Statistics UK", "color": "blue", "url": "https://www.police.uk/pu/your-area/" }
+      ]
+    },
+    {
+      "id": "budget",
+      "title": "Budget & Prices",
+      "iconType": "dollar",
+      "content": {
+        "avgRent1BR": 1200,
+        "studentHousing": 800,
+        "comparison": "15% cheaper than city average"
+      },
+      "sources": [
+        { "id": 1, "name": "Rightmove", "color": "purple", "url": "https://www.rightmove.co.uk/" },
+        { "id": 2, "name": "SpareRoom", "color": "green", "url": "https://www.spareroom.co.uk/" }
+      ]
+    },
+    {
+      "id": "student",
+      "title": "Student Life",
+      "iconType": "graduation",
+      "content": {
+        "percentage": 92,
+        "label": "student-friendly",
+        "highlights": [
+          "5 universities within 2 miles",
+          "Active student community",
+          "Study cafes & libraries nearby"
+        ]
+      },
+      "sources": [
+        { "id": 1, "name": "UCAS", "color": "blue", "url": "https://www.ucas.com/" }
+      ]
+    },
+    {
+      "id": "transport",
+      "title": "Transport",
+      "iconType": "bus",
+      "content": {
+        "tube": { "distance": "3 min", "lines": ["Northern", "Piccadilly"] },
+        "bus": { "distance": "1 min" },
+        "details": "15 min to Central London"
+      },
+      "sources": [
+        { "id": 1, "name": "TfL", "color": "green", "url": "https://tfl.gov.uk/" }
+      ]
+    },
+    {
+      "id": "reviews",
+      "title": "Resident Reviews",
+      "iconType": "star",
+      "content": {
+        "rating": 4.6,
+        "totalReviews": 234,
+        "reviews": [
+          {
+            "text": "Great area for students, very affordable and safe!",
+            "author": "Student",
+            "timeAgo": "2 months ago"
+          },
+          {
+            "text": "Love the community vibe and transport links.",
+            "author": "Resident",
+            "timeAgo": "1 year ago"
+          }
+        ]
+      },
+      "sources": [
+        { "id": 1, "name": "Google Reviews", "color": "orange", "url": "https://www.google.com/maps" },
+        { "id": 2, "name": "Reddit", "color": "purple", "url": "https://www.reddit.com/" }
+      ]
+    },
+    {
+      "id": "amenities",
+      "title": "Nearby Amenities",
+      "iconType": "home",
+      "content": {
+        "amenities": ["Supermarket", "Gym", "Library", "Cafe", "Park", "Restaurant"]
+      },
+      "sources": [
+        { "id": 1, "name": "Google Maps", "color": "green", "url": "https://www.google.com/maps" }
+      ]
+    },
+    {
+      "id": "photos",
+      "title": "Area Photos",
+      "iconType": "map",
+      "content": {
+        "images": [
+          { "alt": "Street view" },
+          { "alt": "Local area" }
+        ]
+      },
+      "sources": [
+        { "id": 1, "name": "Google Street View", "color": "blue", "url": "https://www.google.com/maps/@?layer=c" }
+      ]
+    }
+  ]
+}

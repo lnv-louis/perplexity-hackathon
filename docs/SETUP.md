@@ -50,11 +50,13 @@ perplexity-hackathon/
 │   └── lib/
 │       └── utils.ts              # Utility functions
 ├── docs/
-│   ├── README.md                 # Main documentation (UPDATED)
-│   ├── SETUP.md                  # This file (UPDATED)
-│   ├── FEATURES.md               # User features (UPDATED)
-│   ├── CHANGELOG.md              # Version history (UPDATED)
+│   ├── README.md                 # Main documentation
+│   ├── SETUP.md                  # This file (includes features)
+│   ├── CHANGELOG.md              # Version history
+│   ├── BACKEND_INTEGRATION.md    # API integration guide
 │   └── Report.md                 # Analysis report (DON'T CHANGE)
+├── data/
+│   └── widgets.json              # Widget content definitions
 └── public/                       # Static assets
 ```
 
@@ -188,6 +190,52 @@ lsof -ti:3000 | xargs kill -9
 - Verify `react-zoom-pan-pinch` is installed
 - Check TransformWrapper configuration
 - Ensure no CSS overflow issues on parent containers
+
+## 🎮 User Features
+
+### Canvas Navigation
+- **Pan & Move**: Click & drag anywhere on background to move canvas
+- **Zoom Controls**: Mouse wheel (0.1x to 8x range) or bottom-right buttons
+- **Return to Center**: Green button [⤢] returns to center view
+- **Double Click**: Quick zoom in on any area
+
+### Widget Management
+- **Selection**: Click widget to select (green border + "Selected" badge)
+- **Deselect**: Click canvas background to deselect
+- **Auto-select on Drag**: Grabbing a widget to move it automatically selects it
+- **Moving**: Drag widget header to reposition (auto-selects on drag)
+- **Resizing**: Drag any of 8 handles (corners + edges) to resize
+- **Deleting**: Hover over widget, click red X button in top-right
+- **Expand**: Click Maximize icon to see full widget content in popup
+
+### Widget Types
+1. **Safety & Crime** - Safety scores, crime stats
+2. **Budget & Prices** - Rent prices, affordability
+3. **Student Life** - University proximity, student population
+4. **Transport & Commute** - Tube/bus times, transport lines
+5. **Resident Reviews** - Star ratings, testimonials
+6. **Nearby Amenities** - Supermarkets, gyms, cafes
+7. **Area Photos** - Neighborhood images, street views
+
+### Visual Design
+- **Animated ShaderGradient Background**: WaterPlane shader with green palette
+- **Dotted Grid Overlay**: Subtle canva-style grid (20px spacing)
+- **Widget Cards**: Pure white with smart selection states (green border when selected)
+- **Hover Effects**: Shadow-2xl depth effect on hover
+- **Source Citations**: Circular colored indicators at bottom of widgets
+
+### Keyboard Shortcuts (Planned)
+- `Space + Drag`: Pan canvas
+- `Ctrl/Cmd + Scroll`: Zoom
+- `Ctrl/Cmd + 0`: Reset to center
+- `Delete`: Remove selected widget
+- `Arrow Keys`: Move selected widget
+
+### Responsive Design
+- **Large** (1200px+): 12-column grid
+- **Medium** (996px+): 10-column grid  
+- **Small** (768px+): 6-column grid
+- Touch-friendly controls on mobile
 
 ---
 
