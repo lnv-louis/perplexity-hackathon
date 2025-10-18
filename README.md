@@ -65,6 +65,32 @@ An intelligent housing research platform that transforms complex location querie
 
 ---
 
+## 🧠 Perplexity API Integration
+
+This project leverages the **Perplexity API** as its core intelligence engine for the hackathon. Here's how:
+
+### **API Implementation**
+-   **SDK**: Uses the official `@perplexity-ai/perplexity_ai` TypeScript SDK
+-   **Model**: Powered by `sonar-pro` for high-quality, citation-backed responses
+-   **Streaming**: Implements server-side streaming for real-time response generation
+-   **Context Awareness**: Maintains conversation history (RAG-like memory) to enable intelligent follow-up queries
+
+### **Key Features Enabled by Perplexity**
+1.  **Multi-Widget Generation**: A single query generates multiple contextual widgets (Safety, Transport, Reviews, etc.)
+2.  **Citation-Rich Content**: All widget content includes verifiable sources with clickable citations `[1]`
+3.  **Structured Data Extraction**: The API returns both markdown content and structured data (scores, metrics, locations)
+4.  **Conversational Intelligence**: Follow-up questions understand previous context, creating a seamless research experience
+
+### **API Flow**
+```
+User Query → Next.js API Route (/api/search) → Perplexity API (sonar-pro) → 
+Structured Response → Widget Renderer → Interactive Canvas Display
+```
+
+The Perplexity API's ability to provide real-time, cited, and contextually-aware responses is what makes Homiq's intelligent housing research possible.
+
+---
+
 ## 🛠️ Technical Architecture
 
 This project is a modern, full-stack TypeScript application built with Next.js.
