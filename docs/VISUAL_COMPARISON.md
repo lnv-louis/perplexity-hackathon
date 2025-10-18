@@ -1,3 +1,5 @@
+> **Note:** This document may contain information from previous development sprints. For the most current and accurate information about the project's architecture and features, please refer to the main [README.md](../README.md) file.
+
 # Visual Comparison: v4.0 vs v4.1
 
 ## Widget Layout
