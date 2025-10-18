@@ -242,3 +242,39 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Hide Next.js dev indicator button */
+.nextjs-toast-errors-parent {
+  display: none !important;
+}
+
+/* Canvas background with dotted grid - lower z-index */
+.canvas-background {
+  position: relative;
+  z-index: 1;
+}
+
+.canvas-background::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.5) 1.5px, transparent 1.5px);
+  background-size: 30px 30px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Ensure widgets are above dotted grid */
+.react-grid-item {
+  z-index: 20 !important;
+  position: relative;
+}
+
+/* Grid layout container above background */
+.layout {
+  position: relative;
+  z-index: 5;
+}

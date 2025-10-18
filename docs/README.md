@@ -1,51 +1,111 @@
 
 # Housing Intelligence Grid - Production Ready MVP
 
-## 🎨 Current Design (v3 - Refined)
+## 🎨 Current Design (v3.4 - JSON-Based Widgets & Major UX Improvements)
 
 ### Visual Design
-- **Background**: Soft blue → purple → pink gradient (not beige!)
-- **Widgets**: Pure white with gray borders, no icon backgrounds
-- **Typography**: Headers are larger (text-base font-semibold) and positioned at top
-- **Zoom**: Smooth Canva-style zoom (0.1x to 8x with momentum)
-- **Delete**: Functional - widgets are removed and grid recompacts automatically
+- **Background**: Animated 3D ShaderGradient with waterPlane effect (green theme)
+- **Grid Overlay**: **More visible** dotted grid pattern (50% opacity, 1.5px dots)
+- **Widgets**: Pure white with **enhanced hover shadows** (shadow-2xl)
+- **Typography**: **Larger headers** (text-lg bold) with **bigger icons** (w-5 h-5)
+- **Color Scheme**: **Global dark green** (#166534) for all CTAs and buttons
+- **Widget Structure**: Clean 3-part layout (Header | Body | Footer)
 
 ### Key Features
-✅ **Smooth Canva-Style Zoom**
-- Min: 0.1x, Max: 8x scale
-- Smooth wheel scrolling with momentum
-- Double-click to zoom in
-- Velocity-based panning
+✅ **JSON-Based Widget System**
+- Widgets loaded from `/data/widgets.json`
+- Smart height calculation based on content
+- Dynamic layout generation
+- Easy to extend and modify
 
-✅ **Functional Widget Management**
-- Delete button works properly (removes from state)
-- Grid auto-recompacts when widget deleted
-- Widgets fall into place smoothly
+✅ **Widget Expand Feature**
+- Expand button next to delete button
+- Smooth animation to center popup
+- Full content view when expanded
+- Click outside or X to close
 
-✅ **Improved Widget Layout**
-- Headers: Bigger text (text-base), no icon background, positioned at top
-- Content: Proper overflow handling, no bottom blocking
-- Icons: Direct rendering (no gray background boxes)
+✅ **Enhanced UX**
+- **Grid snapping**: Widgets snap to 24px grid
+- **No selection bugs**: Removed selection state entirely
+- **Always draggable**: Move widgets freely anytime
+- **Always resizable**: Resize from all 8 handles anytime
+- **Hover glow effect**: Green shadow on hover
+- **Clean interactions**: No more stuck states
 
-✅ **Professional Canvas**
-- Infinite pan in all directions
-- Zoom controls (bottom-right)
-- Fixed translucent search bar (top-center)
-- Soft gradient background
+✅ **True Infinite Canvas**
+- No boundary limitations
+- Canvas extends to 10000px+ area
+- Widgets can be placed anywhere
+- Smooth zoom from 0.1x to 8x
+
+✅ **Visual Improvements**
+- Widgets properly layered above dotted grid (z-20)
+- More visible dotted grid pattern (50% opacity)
+- Enhanced hover shadows (shadow-2xl)
+- Global dark green theme (#166534)
+- Next.js dev button hidden
+
+✅ **Widget Structure (3 Parts)**
+1. **Header**: Icon (green, w-5 h-5) + Title (text-lg bold) + Border bottom
+2. **Body**: Scrollable content area (flex-1, py-3) - always visible
+3. **Footer**: Compact source citations (py-1.5, text-[10px])
+
+✅ **Grid System: react-grid-layout**
+- Well-known, battle-tested library (v1.5.0)
+- Drag widgets anywhere
+- Resize from all 8 handles (corners + edges)
+- Auto-compact with vertical compaction
+- Responsive breakpoints (lg/md/sm)
+- Grid snapping enabled
+
+✅ **Backend Integration Ready**
+- JSON format in `/data/widgets.json`
+- Widget content structure documented in BACKEND_INTEGRATION.md
+- Progressive loading strategy planned
+- Perplexity API parallel prompting guide included
 
 ## 🎮 User Controls
 
 **Navigation:**
-- **Pan**: Click and drag anywhere
+- **Pan**: Click and drag anywhere on canvas background
 - **Zoom**: Mouse wheel (smooth scrolling)
 - **Zoom In/Out**: Buttons (bottom-right) 
-- **Reset View**: ⤢ button
+- **Reset View**: ⤢ "Return to Center" button (dark green)
 - **Double-click**: Quick zoom in
+- **Deselect**: Click canvas background
 
 **Widget Management:**
-- **Move**: Drag widget header
-- **Resize**: Drag any border or corner
-- **Delete**: Hover → click red X (actually removes widget!)
+- **Select**: Click widget to select (green border + "Selected" badge)
+- **Move**: Drag widget to move (always enabled, move anywhere with space)
+- **Resize**: Drag any border or corner (8 resize handles, always enabled)
+- **Delete**: Hover → click red X button
+- **Enhanced Hover**: More visible shadow effect for better visual feedback
+
+## 🎯 Implementation Notes
+
+### Current State
+The GridPage.tsx is in transition to JSON-based widgets. Here are the key changes needed:
+
+**Completed:**
+- ✅ JSON data file created at `/data/widgets.json`
+- ✅ CSS updates (z-index, Next.js dev button hidden)
+- ✅ Grid snapping via react-grid-layout config
+- ✅ Documentation updated
+
+**In Progress:**
+- 🔄 GridPage.tsx refactor (removing old static widgets)
+- 🔄 Expand/collapse widget popup implementation
+- 🔄 Import path fixes
+- 🔄 Infinite canvas boundary removal
+
+### Key Implementation Details
+
+1. **JSON Widget Loading**: Import from `../../data/widgets.json`
+2. **Grid Snapping**: Set `compactType="vertical"` and margin `[16, 16]`
+3. **Z-Index Fix**: Applied in globals.css (widgets z-20, grid z-10)
+4. **Expand Button**: Use `<Maximize />` icon from lucide-react
+5. **No Selection State**: Removed `selectedWidget` state, hover effects only
+6. **Infinite Canvas**: Remove `limitToBounds` or set very large min-width/height
 
 ## 🚀 Technical Implementation
 
@@ -114,20 +174,31 @@ bg-white/80 backdrop-blur-md
 - [ ] Parse API responses into widget data
 - [ ] Add new widget types dynamically
 - [ ] Persist layout preferences
+- [ ] Link source citations to URLs
 
-## ✅ Production Checklist
-- [x] Smooth Canva-style zoom
+## ✅ Production Checklist (v3.1)
+- [x] Smooth Canva-style zoom (0.1x to 8x)
 - [x] Functional delete with recompacting
-- [x] No icon backgrounds (clean white)
-- [x] Bigger headers at top
-- [x] No bottom content blocking
-- [x] Soft gradient (not beige)
+- [x] Green central theme
+- [x] Source citations in bottom section
+- [x] Return to center button (green)
+- [x] Background doesn't move while resizing
+- [x] Less sensitive panning
+- [x] No content blocking issues
 - [x] Professional widget styling
 - [ ] Backend API integration
 
+## 📚 Documentation
+
+- **README.md** (this file) - Overview and current design
+- **[SETUP.md](./SETUP.md)** - Technical setup and configuration
+- **[FEATURES.md](./FEATURES.md)** - User-facing features guide
+- **[CHANGELOG.md](./CHANGELOG.md)** - Version history and updates
+- **Report.md** - Initial analysis (don't modify)
+
 ---
 
-**Test**: `http://localhost:3001/housing`
+**Test**: `http://localhost:3000/housing`
 
 **Getting Started**
 
