@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 
+import { useCanvas } from '@/context/CanvasContext';
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -19,7 +21,7 @@ interface ChatWindowProps {
 }
 
 export default function ChatWindow({ isOpen, onClose, initialQuery, onSearchComplete, existingWidgets = [], isSearching: externalSearching }: ChatWindowProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const { messages, setMessages } = useCanvas(); // Use shared state
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -34,30 +36,29 @@ export default function ChatWindow({ isOpen, onClose, initialQuery, onSearchComp
     if (isOpen && !hasInitialized) {
       setHasInitialized(true);
       
-      if (initialQuery) {
-        // User came from homepage with a query - show thinking state immediately
-        const userMessage: Message = {
-          id: Date.now().toString(),
-          role: 'user',
-          content: initialQuery,
-          timestamp: new Date(),
-        };
-        
-        setMessages([userMessage]);
-        setIsLoading(true); // Show thinking animation right away
-        // Note: GridPage's handleSearch will update the widgets
-      } else {
-        // User clicked "Get Started" - show welcome message
-        const welcomeMessage: Message = {
-          id: Date.now().toString(),
-          role: 'assistant',
-          content: '👋 Hey! How can I help you find the perfect place to live? You can ask me about neighborhoods, housing prices, safety, amenities, or anything else about living in a specific area.',
-          timestamp: new Date(),
-        };
-        setMessages([welcomeMessage]);
+      // Only set initial messages if the conversation is empty
+      if (messages.length === 0) {
+        if (initialQuery) {
+          const userMessage: Message = {
+            id: Date.now().toString(),
+            role: 'user',
+            content: initialQuery,
+            timestamp: new Date(),
+          };
+          setMessages([userMessage]);
+          setIsLoading(true);
+        } else {
+          const welcomeMessage: Message = {
+            id: Date.now().toString(),
+            role: 'assistant',
+            content: '👋 Hey! How can I help you find the perfect place to live? You can ask me about neighborhoods, housing prices, safety, amenities, or anything else about living in a specific area.',
+            timestamp: new Date(),
+          };
+          setMessages([welcomeMessage]);
+        }
       }
     }
-  }, [isOpen, initialQuery, hasInitialized]);
+  }, [isOpen, initialQuery, hasInitialized, messages.length, setMessages]);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

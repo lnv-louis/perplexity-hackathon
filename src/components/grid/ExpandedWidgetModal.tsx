@@ -92,23 +92,25 @@ const ExpandedWidgetModalComponent: React.FC<ExpandedWidgetModalProps> = ({ widg
           </div>
         </div>
 
-        {/* Footer - Sources */}
-        <div className="border-t border-gray-100 px-6 py-4 bg-gray-50/50 flex items-center gap-3 flex-shrink-0">
-          <span className="text-sm font-medium text-gray-700">Sources:</span>
-          <div className="flex gap-2">
-            {widget.sources.map((source) => (
-              <div
-                key={source.id}
-                className="flex items-center gap-2 px-3 py-1 bg-white rounded-full border border-gray-200"
-              >
-                <div
-                  className="w-3 h-3 rounded-full"
-                  style={{ backgroundColor: source.color }}
-                />
-                <span className="text-xs text-gray-600">{source.name}</span>
-              </div>
-            ))}
-          </div>
+        {/* Footer - Sources with full names */}
+        <div className="border-t border-gray-100 px-6 py-4 bg-gray-50/50 flex items-center gap-3 flex-shrink-0 flex-wrap">
+          {widget.sources && widget.sources.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium text-gray-700">Sources:</span>
+              {widget.sources.map((source, index) => (
+                <a
+                  key={`${source.id}-${index}`}
+                  href={source.url || '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 px-2 py-1 rounded no-underline font-medium transition-colors"
+                  title={source.name || `Source ${source.id}`}
+                >
+                  {source.name || `Source ${source.id}`}
+                </a>
+              ))}
+            </div>
+          )}
         </div>
       </Card>
     </div>

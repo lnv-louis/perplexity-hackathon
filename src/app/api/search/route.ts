@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Perplexity from '@perplexity-ai/perplexity_ai';
 
+// ... [interfaces remain the same] ...
+
 interface SubPrompt {
   question: string;
   answer: string;
@@ -17,7 +19,7 @@ interface WidgetData {
   title: string;
   content: any;
   citations?: Array<{ number: number; url: string; title: string }>;
-  size?: { w: number; h: number }; // Dynamic sizing
+  size?: { w: number; h: number };
 }
 
 interface SearchResponse {
@@ -25,7 +27,7 @@ interface SearchResponse {
   source: string;
   widget_count: number;
   widgets: WidgetData[];
-  is_followup?: boolean; // Flag for follow-up queries
+  is_followup?: boolean;
 }
 
 interface ConversationMessage {
@@ -33,64 +35,28 @@ interface ConversationMessage {
   content: string;
 }
 
-// Get system prompt from env or use default
 const SYSTEM_PROMPT = process.env.PERPLEXITY_SYSTEM_PROMPT || 
   "You are a real estate research assistant providing concise, accurate information about housing and neighborhoods. Format responses with proper markdown including headers (use ### for main sections), bullet points, and numbered lists. Include relevant citations [1][2] after factual statements. Keep answers focused and under 400 words unless detailed analysis is requested. Always include complete words - never truncate (e.g., write 'area' not 'are'). Structure responses clearly with sections for key information.";
 
 const PROMPT_SUFFIX = process.env.PERPLEXITY_PROMPT_SUFFIX || 
   " Provide a well-structured response with markdown formatting. Use ### headers for main sections. Include citations [1][2] for all facts. Write complete sentences without truncation. Keep the response concise (300-400 words) but comprehensive.";
 
-async function generateSubPrompts(initialPrompt: string, conversationHistory: ConversationMessage[] = []): Promise<string[]> {
-  try {
-    const client = new Perplexity({
-      apiKey: process.env.PERPLEXITY_API_KEY,
-    });
-
-    const messages: ConversationMessage[] = [
-      {
-        role: "system",
-        content: "You are an AI assistant that breaks down a user's broad real estate query into exactly 3 specific, researchable questions. Return them as a numbered list. Consider the conversation context to avoid duplicate questions.",
-      },
-      ...conversationHistory.slice(-4), // Include last 2 exchanges for context
-      {
-        role: "user",
-        content: `Based on the user's query: '${initialPrompt}', generate 3 distinct questions a real estate analyst should investigate. Cover broad topics like safety/crime rates, local amenities (schools, parks), and lifestyle/atmosphere. Avoid topics already covered in previous questions.`,
-      },
-    ];
-
-    const completion = await client.chat.completions.create({
-      model: "sonar",
-      messages
-    });
-    
-    const responseText = completion.choices[0].message.content;
-    
-    // Handle both string and array content types
-    const contentString = typeof responseText === 'string' ? responseText : 
-      Array.isArray(responseText) ? responseText.map(chunk => 
-        'text' in chunk ? chunk.text : ''
-      ).join('') : '';
-    
-    // Parse numbered list response, cap at 3 AI-generated prompts
-    const allParsedLines = contentString.split('\n')
-      .filter((line: string) => line.includes('. '))
-      .map((line: string) => line.split('. ', 2)[1])
-      .filter(Boolean);
-    
-    const prompts = allParsedLines.slice(0, 3);
-
-    // Add specific rental and weather questions
-    const rentalPrompt = `Find 2-3 specific houses or flats currently available for rent in the area mentioned in '${initialPrompt}'. IMPORTANT: For each property, start a new line with the full URL to the listing, then describe: 1. Address and price 2. Key features (bedrooms, bathrooms) 3. Nearby amenities within 5-10 minutes walk. Format each property as a separate paragraph with the URL on its own line.`;
-    
-    const weatherPrompt = `What are the current and typical weather conditions for the location mentioned in '${initialPrompt}'?`;
-    
-    prompts.push(rentalPrompt, weatherPrompt);
-
-    return prompts.length >= 1 ? prompts : [];
-  } catch (error) {
-    console.error('Error generating sub-prompts:', error);
-    return [];
-  }
+// --- REWRITTEN PROMPT GENERATION ---
+async function generateSubPrompts(initialPrompt: string): Promise<string[]> {
+  const location = initialPrompt; // Use the whole query as the location for simplicity
+  const prompts = [
+    // 1. Safety and Crime
+    `Provide a detailed safety and crime analysis for the area '${location}'.`,
+    // 2. Local amenities
+    `List the most popular local amenities in '${location}', including parks, gyms, and supermarkets. Provide specific names and a brief description for 2-3 of them.`,
+    // 3. Lifestyle and atmosphere
+    `Describe the lifestyle and atmosphere of '${location}'. Is it better for students, families, or young professionals? Mention the general vibe, nightlife, and community feel.`,
+    // 4. Available properties
+    `Find 2-3 specific houses or flats currently available for rent in the area mentioned in '${location}'. For each property, provide the full URL to the listing, address, price, and key features like bedrooms and bathrooms.`,
+    // 5. Weather and Climate
+    `What are the current and typical weather conditions for the location mentioned in '${location}'?`
+  ];
+  return prompts;
 }
 
 async function executeSingleQuery(prompt: string, conversationHistory: ConversationMessage[] = []): Promise<QueryResult> {
@@ -99,57 +65,83 @@ async function executeSingleQuery(prompt: string, conversationHistory: Conversat
       apiKey: process.env.PERPLEXITY_API_KEY,
     });
 
-    // Add prompt suffix for better formatting
     const enhancedPrompt = prompt + PROMPT_SUFFIX;
 
-    const messages: ConversationMessage[] = [
-      {
-        role: "system",
-        content: SYSTEM_PROMPT
-      },
-      ...conversationHistory.slice(-6), // Include last 3 exchanges for context
-      {
-        role: "user",
-        content: enhancedPrompt
+    const messagesForApi: ConversationMessage[] = [{ role: 'system', content: SYSTEM_PROMPT }];
+    let lastRole = 'system';
+
+    if (conversationHistory && conversationHistory.length > 0) {
+      conversationHistory.forEach(msg => {
+        if (msg.role !== lastRole) {
+          messagesForApi.push(msg);
+          lastRole = msg.role;
+        }
+      });
+    }
+
+    if (lastRole === 'user') {
+      const lastMsg = messagesForApi.pop();
+      if (lastMsg) {
+        const mergedContent = `${lastMsg.content}\n\n${enhancedPrompt}`;
+        messagesForApi.push({ role: 'user', content: mergedContent });
+      } else {
+        messagesForApi.push({ role: 'user', content: enhancedPrompt });
       }
-    ];
+    } else {
+      messagesForApi.push({ role: 'user', content: enhancedPrompt });
+    }
 
     const completion = await client.chat.completions.create({
       model: "sonar-pro",
-      messages,
+      messages: messagesForApi,
     });
     
     const responseContent = completion.choices[0].message.content;
-    
-    // Handle both string and array content types
     const contentString = typeof responseContent === 'string' ? responseContent : 
-      Array.isArray(responseContent) ? responseContent.map(chunk => 
-        'text' in chunk ? chunk.text : ''
-      ).join('') : '';
+      Array.isArray(responseContent) ? responseContent.map(chunk => 'text' in chunk ? chunk.text : '').join('') : '';
     
-    // Extract citations from API response - Perplexity includes citations in the response
-    const citations: Array<{ number: number; url: string; title: string }> = [];
+    const citations: Array<{ number: number; url: string; title: string, name: string }> = [];
     
-    // Check if response has citations field
     if ((completion as any).citations && Array.isArray((completion as any).citations)) {
       const apiCitations = (completion as any).citations;
-      apiCitations.forEach((cite: string, index: number) => {
-        citations.push({
-          number: index + 1,
-          url: cite,
-          title: `Source ${index + 1}`
-        });
+      apiCitations.forEach((cite: any, index: number) => {
+        let url = '#';
+        let title = `Source ${index + 1}`;
+        let name = `Source ${index + 1}`;
+
+        try {
+          if (typeof cite === 'string') {
+            url = cite;
+            name = new URL(url).hostname.replace('www.', '');
+            title = name;
+          } else if (cite && typeof cite === 'object' && cite.url) {
+            url = cite.url;
+            title = cite.title || new URL(url).hostname.replace('www.', '');
+            name = cite.title || new URL(url).hostname.replace('www.', '');
+          }
+        } catch (e) {
+          console.error('Error parsing citation URL:', e);
+        }
+
+        if (url !== '#') {
+          citations.push({ number: index + 1, url, title, name });
+        }
       });
     } else {
-      // Fallback: try to extract URLs from content using regex
       const urlPattern = /https?:\/\/[^\s\)]+/g;
       const urls = contentString.match(urlPattern) || [];
       urls.slice(0, 10).forEach((url, index) => {
-        citations.push({
-          number: index + 1,
-          url: url,
-          title: `Source ${index + 1}`
-        });
+        try {
+          const name = new URL(url).hostname.replace('www.', '');
+          citations.push({
+            number: index + 1,
+            url: url,
+            title: name,
+            name: name
+          });
+        } catch (e) {
+          console.error('Error parsing fallback URL:', e);
+        }
       });
     }
     
@@ -169,58 +161,33 @@ async function executeSingleQuery(prompt: string, conversationHistory: Conversat
   }
 }
 
-// Helper: Calculate dynamic widget size based on content length (larger sizes to show more content)
+// --- REWRITTEN WIDGET SIZING ---
 function calculateWidgetSize(content: string): { w: number; h: number } {
-  const length = content.length;
-  
-  // Larger sizes to display more content before opening widget
-  // w: width units (2-3), h: height units (3-4)
-  if (length < 400) return { w: 2, h: 3 }; // Small content
-  if (length < 800) return { w: 2, h: 4 }; // Medium content - taller
-  if (length < 1200) return { w: 3, h: 4 }; // Large content - wider and taller
-  return { w: 3, h: 5 }; // Very large content - maximum size for readability
+  // Return a smaller, uniform size for the summary view.
+  return { w: 2, h: 4 };
 }
 
-// Helper: Extract citations from content
 function extractCitations(content: string): Array<{ number: number; url: string; title: string }> {
-  const citations: Array<{ number: number; url: string; title: string }> = [];
-  const citationPattern = /\[(\d+)\]/g;
-  const matches = content.matchAll(citationPattern);
-  
-  for (const match of matches) {
-    const num = parseInt(match[1]);
-    if (!citations.find(c => c.number === num)) {
-      citations.push({
-        number: num,
-        url: `#citation-${num}`, // Placeholder, will be replaced with actual URLs if available
-        title: `Source ${num}`
-      });
-    }
-  }
-  
-  return citations;
+    // This function can be simplified as citations are now extracted directly in executeSingleQuery
+    return [];
 }
 
 async function runQueriesInParallel(prompts: string[], conversationHistory: ConversationMessage[] = []): Promise<SubPrompt[]> {
   if (!prompts.length) return [];
-
   try {
-    // Add delays between Promise creations to respect rate limits
     const delayedPromises = prompts.map((prompt, index) => 
       new Promise<SubPrompt>((resolve) => {
         setTimeout(async () => {
           const result = await executeSingleQuery(prompt, conversationHistory);
-          resolve({ 
+          resolve({
             question: prompt, 
             answer: result.content,
             citations: result.citations
           });
-        }, index * 2000); // 2 second delay between each
+        }, index * 2000);
       })
     );
-
-    const results = await Promise.all(delayedPromises);
-    return results;
+    return await Promise.all(delayedPromises);
   } catch (error) {
     console.error('Error running parallel queries:', error);
     return [];
@@ -232,58 +199,31 @@ function extractTitleFromQuestion(question: string): string {
     "what is", "what are", "how is", "how are", "tell me about",
     "describe", "explain", "find", "can you", "please", "the", "a", "an"
   ];
-  
   let text = question.toLowerCase();
   cleaners.forEach(cleaner => {
     text = text.replace(cleaner, "");
   });
-
   let title = text.trim().replace(/[?.,]/g, "");
   title = title.charAt(0).toUpperCase() + title.slice(1);
-
-  if (question.toLowerCase().includes("available for rent")) {
-    return "Available Properties";
-  }
-  if (question.toLowerCase().includes("weather conditions")) {
-    return "Weather & Climate";
-  }
-
   const words = title.split(" ");
   if (words.length > 4) {
     title = words.slice(0, 4).join(" ");
   }
-
   return title;
 }
 
-function extractPropertyLinks(rentalAnswer: string) {
-  if (!rentalAnswer) return [];
-
-  const properties: Array<{ description: string; url?: string }> = [];
-  const lines = rentalAnswer.split('\n');
-  
-  lines.forEach(line => {
-    if (line.toLowerCase().includes('http') || 
-        line.toLowerCase().includes('www.') || 
-        line.toLowerCase().includes('.com') || 
-        line.toLowerCase().includes('.co.uk')) {
-      const url = line.split(' ').find(word => 
-        word.startsWith('http') || word.startsWith('www')
-      );
-      properties.push({
-        description: line.trim(),
-        url
-      });
-    }
-  });
-
-  return properties;
-}
-
+// --- REWRITTEN PAYLOAD BUILDER ---
 function buildUiPayload(results: SubPrompt[]): SearchResponse {
-  const widgetIds = ['safety', 'budget', 'student', 'transport', 'reviews', 'locations'];
-  
-  if (!results || !Array.isArray(results)) {
+  // The new, fixed order and titles
+  const widgetConfig = [
+    { id: 'safety', title: 'Safety and Crime' },
+    { id: 'amenities', title: 'Local Amenities' },
+    { id: 'lifestyle', title: 'Lifestyle and Atmosphere' },
+    { id: 'properties', title: 'Available Properties' },
+    { id: 'weather', title: 'Weather and Climate' }
+  ];
+
+  if (!results || !Array.isArray(results) || results.length < widgetConfig.length) {
     return {
       generated_at: new Date().toISOString(),
       source: 'next-api',
@@ -292,42 +232,21 @@ function buildUiPayload(results: SubPrompt[]): SearchResponse {
     };
   }
 
-  const rentalAnswer = results.length > 3 ? results[3].answer : null;
-  const properties = extractPropertyLinks(rentalAnswer || '');
-
-  const mapped: WidgetData[] = [];
-
-  // Map results to widgets with dynamic sizing and citations
-  results.slice(0, 5).forEach((result, index) => {
-    const widgetId = widgetIds[index];
-    const title = extractTitleFromQuestion(result.question);
+  const mapped: WidgetData[] = widgetConfig.map((config, index) => {
+    const result = results[index];
     const contentStr = typeof result.answer === 'string' ? result.answer : JSON.stringify(result.answer);
     const size = calculateWidgetSize(contentStr);
-    // Use citations from query result if available, otherwise extract from content
     const citations = (result.citations && result.citations.length > 0) 
       ? result.citations 
       : extractCitations(contentStr);
     
-    if (widgetId === 'locations') {
-      mapped.push({
-        id: 'locations',
-        title: 'Available Properties',
-        content: {
-          properties,
-          last_updated: new Date().toISOString()
-        },
-        size: { w: 3, h: 4 }, // Properties widget is larger to show more content
-        citations: []
-      });
-    } else if (widgetId) {
-      mapped.push({
-        id: widgetId,
-        title,
-        content: result.answer,
-        size,
-        citations
-      });
-    }
+    return {
+      id: config.id,
+      title: config.title, // Use the new static title
+      content: result.answer,
+      size,
+      citations
+    };
   });
 
   return {
@@ -343,49 +262,30 @@ export async function POST(request: NextRequest) {
     const { query, isFollowUp, existingWidgets = [], conversationHistory = [] } = await request.json();
 
     if (!query) {
-      return NextResponse.json(
-        { error: 'Query is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Query is required' }, { status: 400 });
     }
 
     console.log('Processing housing search query:', query);
-    console.log('Is follow-up?', isFollowUp);
-    console.log('Existing widgets:', existingWidgets.length);
-    console.log('Conversation history length:', conversationHistory.length);
 
     if (isFollowUp) {
-      // Handle follow-up query - single focused query with conversation context
-      console.log('Running single follow-up query with RAG memory...');
+      console.log('Running single follow-up query...');
       const result = await executeSingleQuery(query, conversationHistory);
-      
-      // Generate a unique widget ID
       const newWidgetId = `widget-${Date.now()}`;
       
-      // Extract title and ensure it's unique
-      let title = extractTitleFromQuestion(query);
-      const existingTitles = existingWidgets.map((w: any) => w.title.toLowerCase());
-      let titleSuffix = 1;
-      let uniqueTitle = title;
-      
-      // Prevent duplicate titles
-      while (existingTitles.includes(uniqueTitle.toLowerCase())) {
-        uniqueTitle = `${title} ${titleSuffix}`;
-        titleSuffix++;
-      }
-      
-      const size = calculateWidgetSize(result.content);
+      // Use a static title for follow-up and prepend the question to the content
+      const uniqueTitle = "Follow up";
+      const newContent = `### ${query}\n\n${result.content}`;
+
+      const size = calculateWidgetSize(newContent);
       const citations = result.citations.length > 0 ? result.citations : extractCitations(result.content);
       
       const newWidget: WidgetData = {
         id: newWidgetId,
         title: uniqueTitle,
-        content: result.content,
+        content: newContent, // Use the combined content
         size,
         citations
       };
-      
-      console.log('Follow-up query completed, returning 1 new widget:', uniqueTitle);
       
       return NextResponse.json({
         generated_at: new Date().toISOString(),
@@ -396,32 +296,18 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Original flow: Initial search with parallel queries
-    // Step 1: Generate sub-prompts with conversation context
-    const prompts = await generateSubPrompts(query, conversationHistory);
+    const prompts = await generateSubPrompts(query);
     if (!prompts.length) {
-      return NextResponse.json(
-        { error: 'Failed to generate research questions' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Failed to generate research questions' }, { status: 500 });
     }
 
-    console.log('Generated prompts:', prompts.length);
-
-    // Step 2: Run parallel queries with conversation context
     const results = await runQueriesInParallel(prompts, conversationHistory);
-    
-    // Step 3: Build UI payload
     const payload = buildUiPayload(results);
 
     console.log('Search completed, returning', payload.widget_count, 'widgets');
-
     return NextResponse.json(payload);
   } catch (error) {
     console.error('Housing search error:', error);
-    return NextResponse.json(
-      { error: 'Failed to process search' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to process search' }, { status: 500 });
   }
 }

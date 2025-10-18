@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { Responsive, WidthProvider } from 'react-grid-layout';
 import { ShaderGradientCanvas, ShaderGradient } from '@shadergradient/react';
@@ -15,6 +16,7 @@ import { ExpandedWidgetModal } from '@/components/grid/ExpandedWidgetModal';
 import ChatWindow from '@/components/grid/ChatWindow';
 import { iconMap, calculateWidgetHeight, getSmartIcon } from '@/lib/widgetHelpers';
 import { renderWidgetContent } from '@/lib/widgetRenderer';
+import useLocalStorage from '@/hooks/use-local-storage';
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
 
@@ -43,26 +45,38 @@ interface WidgetData {
   loading?: boolean;
 }
 
+import { useCanvas } from '@/context/CanvasContext';
+
 const GridPage: React.FC = () => {
   const searchParams = useSearchParams();
   const initialQuery = searchParams?.get('q') || '';
   const isWelcome = searchParams?.get('welcome') === 'true';
   
+  // Use shared state from context
+  const {
+    apiWidgets, setApiWidgets,
+    activeWidgets, setActiveWidgets,
+    locationTitle, setLocationTitle
+  } = useCanvas();
+
   const [isSearching, setIsSearching] = useState(false);
   const [hoveredWidget, setHoveredWidget] = useState<string | null>(null);
   const [selectedWidget, setSelectedWidget] = useState<string | null>(null);
   const [expandedWidget, setExpandedWidget] = useState<string | null>(null);
-  const [isChatOpen, setIsChatOpen] = useState(!!initialQuery || isWelcome); // Auto-open chat if query provided or welcome
-  const [activeWidgets, setActiveWidgets] = useState<string[]>([]);
+  const [isChatOpen, setIsChatOpen] = useState(!!initialQuery || isWelcome);
   const [hasSearched, setHasSearched] = useState(false);
-  const [apiWidgets, setApiWidgets] = useState<any[]>([]); // Store API response widgets
+  const [savedWidgets, setSavedWidgets] = useLocalStorage<any[]>('saved-widgets', []);
 
   // Memoized handlers
   const handleSearch = useCallback(async (query: string) => {
     if (!query.trim()) return;
     
     setIsSearching(true);
-    setIsChatOpen(true); // Always open chat when searching
+    setIsChatOpen(true);
+    
+    const cleanQuery = query.replace(/^(housing in|about|in)\s+/i, '').trim();
+    setLocationTitle(cleanQuery.split(',').map(s => s.trim().charAt(0).toUpperCase() + s.trim().slice(1)).join(', '));
+
     console.log('Starting housing search for:', query);
     
     try {
@@ -80,23 +94,14 @@ const GridPage: React.FC = () => {
 
       const data = await response.json();
       console.log('Search results received:', data);
-      console.log('📦 API Response Details:', {
-        widget_count: data.widget_count,
-        widgets: data.widgets,
-        first_widget: data.widgets?.[0]
-      });
 
       if (data.widgets && Array.isArray(data.widgets)) {
-        // Store the API widgets to merge with static widgets
         setApiWidgets(data.widgets);
         const newWidgetIds = data.widgets.map((widget: any) => widget.id);
         setActiveWidgets(newWidgetIds);
-        console.log('Updated widgets from API:', newWidgetIds);
-        console.log('Full API widgets data:', data.widgets);
       }
     } catch (error) {
       console.error('Search error:', error);
-      // TODO: Show error message to user
     } finally {
       setIsSearching(false);
     }
@@ -181,6 +186,18 @@ const GridPage: React.FC = () => {
     }
   }, []);
 
+  const handleSaveWidget = useCallback((e: React.MouseEvent, widgetToSave: any) => {
+    e.stopPropagation();
+    setSavedWidgets(prev => {
+      const isAlreadySaved = prev.some(w => w.id === widgetToSave.id);
+      if (isAlreadySaved) {
+        return prev.filter(w => w.id !== widgetToSave.id);
+      } else {
+        return [...prev, widgetToSave];
+      }
+    });
+  }, [setSavedWidgets]);
+
   // Memoize widget event handlers to prevent re-creation
   const handleWidgetMouseEnter = useCallback((widgetId: string) => {
     setHoveredWidget(widgetId);
@@ -244,12 +261,13 @@ const GridPage: React.FC = () => {
                         target="_blank" 
                         rel="noopener noreferrer"
                         className="inline-flex items-center text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 px-1.5 py-0.5 rounded ml-0.5 no-underline font-medium"
-                        title={citation?.title}
+                        title={citation?.title || 'Source'}
                         {...props}
                       />
                     );
                   }
-                  return <a className="text-blue-600 hover:text-blue-800 underline" href={href} {...props} />;
+                  // Ensure href is not undefined for regular links
+                  return <a className="text-blue-600 hover:text-blue-800 underline" href={href || '#'} {...props} />;
                 },
                 h1: ({node, ...props}) => <h1 className="font-bold text-xl mb-3 mt-4 text-gray-900" {...props} />,
                 h2: ({node, ...props}) => <h2 className="font-bold text-lg mb-2 mt-3 text-gray-900" {...props} />,
@@ -448,6 +466,17 @@ const GridPage: React.FC = () => {
       {/* Breadcrumb */}
       <Breadcrumb />
 
+      <Link href="/collection" className="fixed top-6 left-48 z-40 bg-white/90 backdrop-blur-sm text-gray-700 px-4 py-2 rounded-full font-medium shadow-lg border border-gray-200 hover:bg-white transition-colors">
+        My Collection
+      </Link>
+
+      {/* Location Title */}
+      {locationTitle && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-30">
+          <h2 className="text-2xl font-bold text-gray-800 bg-white/80 backdrop-blur-sm px-6 py-2 rounded-full shadow-lg border border-gray-200">{locationTitle}</h2>
+        </div>
+      )}
+
       {/* Chat button */}
       <button
         onClick={handleChatOpen}
@@ -541,26 +570,31 @@ const GridPage: React.FC = () => {
                   draggableHandle=".drag-handle"
                   onDragStart={handleDragStart}
                 >
-                  {memoizedActiveWidgets.map((widget) => (
-                    <div key={widget.id}>
-                      <WidgetCard
-                        widget={widget}
-                        isHovered={hoveredWidget === widget.id}
-                        isSelected={selectedWidget === widget.id}
-                        onMouseEnter={() => handleWidgetMouseEnter(widget.id)}
-                        onMouseLeave={handleWidgetMouseLeave}
-                        onClick={(e) => handleWidgetClick(widget.id, e)}
-                        onDelete={(e) => {
-                          e.stopPropagation();
-                          handleDelete(widget.id);
-                        }}
-                        onExpand={(e) => {
-                          e.stopPropagation();
-                          handleExpand(widget.id);
-                        }}
-                      />
-                    </div>
-                  ))}
+                  {memoizedActiveWidgets.map((widget) => {
+                    const rawApiWidget = apiWidgets.find(w => w.id === widget.id) || widget;
+                    return (
+                      <div key={widget.id}>
+                        <WidgetCard
+                          widget={widget}
+                          isHovered={hoveredWidget === widget.id}
+                          isSelected={selectedWidget === widget.id}
+                          isSaved={savedWidgets.some(w => w.id === widget.id)}
+                          onMouseEnter={() => handleWidgetMouseEnter(widget.id)}
+                          onMouseLeave={handleWidgetMouseLeave}
+                          onClick={(e) => handleWidgetClick(widget.id, e)}
+                          onDelete={(e) => {
+                            e.stopPropagation();
+                            handleDelete(widget.id);
+                          }}
+                          onExpand={(e) => {
+                            e.stopPropagation();
+                            handleExpand(widget.id);
+                          }}
+                          onSave={(e) => handleSaveWidget(e, rawApiWidget)} // Pass the raw data
+                        />
+                      </div>
+                    )
+                  })}
                 </ResponsiveGridLayout>
               </div>
             </TransformComponent>

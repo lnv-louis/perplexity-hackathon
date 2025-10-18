@@ -26,11 +26,23 @@ export const iconMap: Record<string, React.ReactNode> = {
 };
 
 // Smart icon selection based on widget title/content
-export function getSmartIcon(title: string, content: string = ''): string {
+export function getSmartIcon(title: string, content: string = '', widgetId: string = ''): string {
+  // Use a generic icon for all follow-up widgets
+  if (widgetId.startsWith('widget-')) {
+    return 'info';
+  }
+
   const lowerTitle = title.toLowerCase();
   const lowerContent = content.toLowerCase();
   const combined = lowerTitle + ' ' + lowerContent;
   
+  // Specific overrides for new titles
+  if (lowerTitle.includes('safety and crime')) return 'shield';
+  if (lowerTitle.includes('local amenities')) return 'coffee';
+  if (lowerTitle.includes('lifestyle and atmosphere')) return 'heart';
+  if (lowerTitle.includes('available properties')) return 'home';
+  if (lowerTitle.includes('weather and climate')) return 'weather';
+
   // Weather-related
   if (/weather|climate|temperature|rain|sun/.test(combined)) return 'weather';
   
