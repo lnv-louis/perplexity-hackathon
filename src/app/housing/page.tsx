@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense } from 'react';
-import GridPage from '@/pages/GridPage';
+import GridPage from '@/page-components/GridPage';
 
 function HousingContent() {
   return <GridPage />;

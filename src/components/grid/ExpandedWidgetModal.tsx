@@ -14,6 +14,7 @@ interface ExpandedWidgetModalProps {
       id: number;
       name: string;
       color: string;
+      url?: string;  // Optional URL for citations
     }>;
   } | null;
   onClose: () => void;
