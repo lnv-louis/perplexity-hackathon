@@ -1,16 +1,19 @@
 'use client';
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { Responsive, WidthProvider } from 'react-grid-layout';
 import { ShaderGradientCanvas, ShaderGradient } from '@shadergradient/react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import widgetsData from '../../data/widgets.json';
 import { WidgetCard } from '@/components/grid/WidgetCard';
 import { ZoomControls } from '@/components/grid/ZoomControls';
 import { Breadcrumb } from '@/components/grid/Breadcrumb';
 import { ExpandedWidgetModal } from '@/components/grid/ExpandedWidgetModal';
 import ChatWindow from '@/components/grid/ChatWindow';
-import { iconMap, calculateWidgetHeight } from '@/lib/widgetHelpers';
+import { iconMap, calculateWidgetHeight, getSmartIcon } from '@/lib/widgetHelpers';
 import { renderWidgetContent } from '@/lib/widgetRenderer';
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
@@ -41,21 +44,71 @@ interface WidgetData {
 }
 
 const GridPage: React.FC = () => {
+  const searchParams = useSearchParams();
+  const initialQuery = searchParams?.get('q') || '';
+  const isWelcome = searchParams?.get('welcome') === 'true';
+  
   const [isSearching, setIsSearching] = useState(false);
   const [hoveredWidget, setHoveredWidget] = useState<string | null>(null);
   const [selectedWidget, setSelectedWidget] = useState<string | null>(null);
   const [expandedWidget, setExpandedWidget] = useState<string | null>(null);
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [activeWidgets, setActiveWidgets] = useState<string[]>([
-    'safety', 'budget', 'student', 'transport', 'reviews', 'amenities', 'photos'
-  ]);
+  const [isChatOpen, setIsChatOpen] = useState(!!initialQuery || isWelcome); // Auto-open chat if query provided or welcome
+  const [activeWidgets, setActiveWidgets] = useState<string[]>([]);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [apiWidgets, setApiWidgets] = useState<any[]>([]); // Store API response widgets
 
   // Memoized handlers
-  const handleSearch = useCallback((query: string) => {
+  const handleSearch = useCallback(async (query: string) => {
     if (!query.trim()) return;
+    
     setIsSearching(true);
-    setTimeout(() => setIsSearching(false), 2000);
+    setIsChatOpen(true); // Always open chat when searching
+    console.log('Starting housing search for:', query);
+    
+    try {
+      const response = await fetch('/api/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Search failed: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('Search results received:', data);
+      console.log('📦 API Response Details:', {
+        widget_count: data.widget_count,
+        widgets: data.widgets,
+        first_widget: data.widgets?.[0]
+      });
+
+      if (data.widgets && Array.isArray(data.widgets)) {
+        // Store the API widgets to merge with static widgets
+        setApiWidgets(data.widgets);
+        const newWidgetIds = data.widgets.map((widget: any) => widget.id);
+        setActiveWidgets(newWidgetIds);
+        console.log('Updated widgets from API:', newWidgetIds);
+        console.log('Full API widgets data:', data.widgets);
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+      // TODO: Show error message to user
+    } finally {
+      setIsSearching(false);
+    }
   }, []);
+
+  // Handle initial query from homepage
+  useEffect(() => {
+    if (initialQuery && !hasSearched) {
+      setHasSearched(true);
+      handleSearch(initialQuery);
+    }
+  }, [initialQuery, hasSearched, handleSearch]);
 
   const handleDelete = useCallback((widgetId: string) => {
     setActiveWidgets(prev => prev.filter(id => id !== widgetId));
@@ -107,6 +160,23 @@ const GridPage: React.FC = () => {
     setIsChatOpen(false);
   }, []);
 
+  // Handle new widgets from chat
+  const handleChatSearchComplete = useCallback((newWidgets: any[]) => {
+    // Check if it's a follow-up (single widget)
+    if (newWidgets.length === 1 && newWidgets[0].id.startsWith('widget-')) {
+      // Append new widget to existing ones
+      setApiWidgets(prev => [...prev, ...newWidgets]);
+      setActiveWidgets(prev => [...prev, newWidgets[0].id]);
+      console.log('Appended follow-up widget:', newWidgets[0].id);
+    } else {
+      // Initial search - replace all widgets
+      setApiWidgets(newWidgets);
+      const newWidgetIds = newWidgets.map((widget: any) => widget.id);
+      setActiveWidgets(newWidgetIds);
+      console.log('Replaced widgets with initial search:', newWidgetIds);
+    }
+  }, []);
+
   // Memoize widget event handlers to prevent re-creation
   const handleWidgetMouseEnter = useCallback((widgetId: string) => {
     setHoveredWidget(widgetId);
@@ -116,10 +186,13 @@ const GridPage: React.FC = () => {
     setHoveredWidget(null);
   }, []);
 
-  // Generate widgets from JSON data
+  // Generate widgets from JSON data - MERGE static widgets with API data
   const widgets: Record<string, WidgetData> = useMemo(() => {
     const widgetMap: Record<string, WidgetData> = {};
     
+    console.log('🔄 Regenerating widgets, apiWidgets count:', apiWidgets.length);
+    
+    // Start with static widgets from JSON
     (widgetsData.widgets as WidgetContent[]).forEach((widgetData) => {
       widgetMap[widgetData.id] = {
         id: widgetData.id,
@@ -130,29 +203,164 @@ const GridPage: React.FC = () => {
       };
     });
     
+    // Override with API data if available
+    apiWidgets.forEach((apiWidget) => {
+      console.log('🎨 Processing API widget:', apiWidget.id, apiWidget.title);
+      // Get the static widget structure (for icon and layout)
+      const staticWidget = widgetMap[apiWidget.id];
+      
+      // For new follow-up widgets, create from scratch
+      if (!staticWidget) {
+        const contentStr = typeof apiWidget.content === 'string' ? apiWidget.content : JSON.stringify(apiWidget.content);
+        const smartIconType = getSmartIcon(apiWidget.title, contentStr);
+        
+        console.log('🆕 Creating new follow-up widget:', apiWidget.id, 'Icon:', smartIconType);
+        
+        widgetMap[apiWidget.id] = {
+          id: apiWidget.id,
+          title: apiWidget.title,
+          icon: iconMap[smartIconType],
+          content: <div className="prose prose-sm max-w-none text-gray-700">
+            <ReactMarkdown 
+              remarkPlugins={[remarkGfm]}
+              components={{
+                p: ({node, ...props}) => <p className="mb-3 leading-relaxed" {...props} />,
+                strong: ({node, ...props}) => <strong className="font-semibold text-gray-900" {...props} />,
+                ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-3 space-y-1" {...props} />,
+                ol: ({node, ...props}) => <ol className="list-decimal pl-5 mb-3 space-y-1" {...props} />,
+                li: ({node, ...props}) => <li className="leading-relaxed" {...props} />,
+                a: ({node, href, ...props}) => {
+                  const isCitation = /^\[(\d+)\]$/.test(props.children?.toString() || '');
+                  if (isCitation) {
+                    const citationNum = props.children?.toString().match(/\d+/)?.[0];
+                    const citation = apiWidget.citations?.find((c: any) => c.number === parseInt(citationNum || '0'));
+                    return (
+                      <a 
+                        href={citation?.url || href || '#'} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 px-1.5 py-0.5 rounded ml-0.5 no-underline font-medium"
+                        title={citation?.title}
+                        {...props}
+                      />
+                    );
+                  }
+                  return <a className="text-blue-600 hover:text-blue-800 underline" href={href} {...props} />;
+                },
+                h1: ({node, ...props}) => <h1 className="font-bold text-xl mb-3 mt-4 text-gray-900" {...props} />,
+                h2: ({node, ...props}) => <h2 className="font-bold text-lg mb-2 mt-3 text-gray-900" {...props} />,
+                h3: ({node, ...props}) => <h3 className="font-semibold text-base mb-2 mt-3 text-gray-800" {...props} />,
+                code: ({node, ...props}) => <code className="bg-gray-100 px-1 py-0.5 rounded text-sm" {...props} />,
+              }}
+            >
+              {apiWidget.content}
+            </ReactMarkdown>
+          </div>,
+          sources: apiWidget.citations || [],
+        };
+        return;
+      }
+      
+      if (staticWidget) {
+        // Find the original widget data from JSON for iconType
+        const originalWidget = (widgetsData.widgets as WidgetContent[]).find(w => w.id === apiWidget.id);
+        
+        console.log('✅ Merging API data for widget:', apiWidget.id, 'Title:', apiWidget.title);
+        
+        // Merge: keep icon/layout from static, update title and content from API
+        widgetMap[apiWidget.id] = {
+          ...staticWidget,
+          title: apiWidget.title || staticWidget.title,
+          content: typeof apiWidget.content === 'string' 
+            ? <div className="prose prose-sm max-w-none text-gray-700">
+                <ReactMarkdown 
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    // Style markdown elements
+                    p: ({node, ...props}) => <p className="mb-3 leading-relaxed" {...props} />,
+                    strong: ({node, ...props}) => <strong className="font-semibold text-gray-900" {...props} />,
+                    ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-3 space-y-1" {...props} />,
+                    ol: ({node, ...props}) => <ol className="list-decimal pl-5 mb-3 space-y-1" {...props} />,
+                    li: ({node, ...props}) => <li className="leading-relaxed" {...props} />,
+                    a: ({node, href, ...props}) => {
+                      // Check if it's a citation link [1], [2], etc.
+                      const isCitation = /^\[(\d+)\]$/.test(props.children?.toString() || '');
+                      if (isCitation) {
+                        const citationNum = props.children?.toString().match(/\d+/)?.[0];
+                        const citation = apiWidget.citations?.find((c: any) => c.number === parseInt(citationNum || '0'));
+                        return (
+                          <a 
+                            href={citation?.url || href || '#'} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 px-1.5 py-0.5 rounded ml-0.5 no-underline font-medium"
+                            title={citation?.title}
+                            {...props}
+                          />
+                        );
+                      }
+                      return <a className="text-blue-600 hover:text-blue-800 underline" href={href} {...props} />;
+                    },
+                    h1: ({node, ...props}) => <h1 className="font-bold text-xl mb-3 mt-4 text-gray-900" {...props} />,
+                    h2: ({node, ...props}) => <h2 className="font-bold text-lg mb-2 mt-3 text-gray-900" {...props} />,
+                    h3: ({node, ...props}) => <h3 className="font-semibold text-base mb-2 mt-3 text-gray-800" {...props} />,
+                    code: ({node, ...props}) => <code className="bg-gray-100 px-1 py-0.5 rounded text-sm" {...props} />,
+                  }}
+                >
+                  {apiWidget.content}
+                </ReactMarkdown>
+              </div>
+            : renderWidgetContent({
+                id: apiWidget.id,
+                title: apiWidget.title,
+                iconType: originalWidget?.iconType || 'info',
+                content: apiWidget.content,
+                sources: staticWidget.sources
+              } as WidgetContent),
+        };
+      }
+    });
+    
     return widgetMap;
-  }, []);
+  }, [apiWidgets]);
 
-  // Generate layouts dynamically based on content
+  // Generate layouts dynamically based on content and API sizes
   const dynamicLayouts = useMemo(() => {
     const lg: any[] = [];
     const md: any[] = [];
     const sm: any[] = [];
     
-    // Start from top-left (0, 0)
-    let xPosLg = 0;
+    const activeWidgetData = activeWidgets.map(id => {
+      // Find API widget first (has dynamic size)
+      const apiWidget = apiWidgets.find(w => w.id === id);
+      const staticWidget = (widgetsData.widgets as WidgetContent[]).find(w => w.id === id);
+      
+      return {
+        id,
+        size: apiWidget?.size || { w: 3, h: 2 }, // Use API size or default
+        content: staticWidget?.content
+      };
+    });
+    
+    // Calculate total width needed to center widgets
+    const totalCols = 12;
+    const widgetWidthSum = activeWidgetData.reduce((sum, w) => sum + w.size.w, 0);
+    const startXOffset = Math.max(0, Math.floor((totalCols - widgetWidthSum) / 2));
+    
+    // Start from centered position
+    let xPosLg = startXOffset;
     let yPosLg = 0;
     let xPosMd = 0;
     let yPosMd = 0;
     let yPosSm = 0;
     
-    (widgetsData.widgets as WidgetContent[]).forEach((widgetData) => {
-      const height = calculateWidgetHeight(widgetData.content, widgetData.id);
-      const width = widgetData.id === 'reviews' ? 6 : 3;
+    activeWidgetData.forEach((widgetData) => {
+      const height = widgetData.size.h * 2; // Convert to grid units
+      const width = widgetData.size.w * 3;   // Convert to grid units
       
-      // Large layout
-      if (xPosLg + width > 12) {
-        xPosLg = 0;
+      // Large layout - centered
+      if (xPosLg + width > totalCols) {
+        xPosLg = startXOffset;
         yPosLg += height;
       }
       lg.push({
@@ -161,13 +369,14 @@ const GridPage: React.FC = () => {
         y: yPosLg,
         w: width,
         h: height,
-        minW: 2,
+        minW: 3,
         minH: 2,
       });
       xPosLg += width;
       
       // Medium layout
-      if (xPosMd + (width > 4 ? 10 : 5) > 10) {
+      const mdWidth = Math.min(width, 10);
+      if (xPosMd + mdWidth > 10) {
         xPosMd = 0;
         yPosMd += height;
       }
@@ -175,12 +384,12 @@ const GridPage: React.FC = () => {
         i: widgetData.id,
         x: xPosMd,
         y: yPosMd,
-        w: width > 4 ? 10 : 5,
+        w: mdWidth,
         h: height,
-        minW: 2,
+        minW: 3,
         minH: 2,
       });
-      xPosMd += (width > 4 ? 10 : 5);
+      xPosMd += mdWidth;
       
       // Small layout
       sm.push({
@@ -189,14 +398,14 @@ const GridPage: React.FC = () => {
         y: yPosSm,
         w: 6,
         h: height,
-        minW: 2,
+        minW: 3,
         minH: 2,
       });
       yPosSm += height;
     });
     
     return { lg, md, sm };
-  }, []);
+  }, [activeWidgets, apiWidgets]);
 
   const layouts = dynamicLayouts;
 
@@ -240,17 +449,19 @@ const GridPage: React.FC = () => {
       </button>
 
       {/* Infinite canvas with less sensitive zoom */}
-      <TransformWrapper
+            <TransformWrapper
         initialScale={0.6}
-        minScale={0.5}
-        maxScale={3}
-        centerOnInit={true}
+        initialPositionX={-200}
+        initialPositionY={-100}
+        minScale={0.1}
+        maxScale={8}
         limitToBounds={false}
-        doubleClick={{ disabled: false, mode: 'zoomIn', step: 0.3 }}
-        wheel={{ 
-          step: 0.01,
-          smoothStep: 0.001,
-          wheelDisabled: false,
+        centerOnInit={true}
+        wheel={{ wheelDisabled: false, step: 0.1 }}
+        doubleClick={{ 
+          disabled: false, 
+          mode: 'zoomIn',
+          step: 0.3,
           excluded: ['input', 'button', 'a']
         }}
         panning={{ 
@@ -279,9 +490,29 @@ const GridPage: React.FC = () => {
             {/* Canvas content */}
             <TransformComponent wrapperClass="!w-screen !h-screen">
               <div 
-                className="p-6 min-h-[3000px] min-w-[4000px] canvas-background"
+                className="p-6 min-h-[2000px] min-w-[2000px] canvas-background relative"
                 onClick={handleCanvasClick}
               >
+                {/* Loading Overlay */}
+                {isSearching && (
+                  <div className="absolute inset-0 bg-gray-900/30 backdrop-blur-[2px] z-50 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="relative">
+                        {/* Animated spinner */}
+                        <div className="w-16 h-16 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
+                        {/* Pulse ring */}
+                        <div className="absolute inset-0 w-16 h-16 border-4 border-white/10 rounded-full animate-ping mx-auto"></div>
+                      </div>
+                      <p className="text-white text-xl font-semibold tracking-wide animate-pulse">
+                        Generating...
+                      </p>
+                      <p className="text-white/70 text-sm mt-2">
+                        Researching your query with Perplexity AI
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 <ResponsiveGridLayout
                   className="layout"
                   layouts={layouts}
@@ -335,6 +566,8 @@ const GridPage: React.FC = () => {
       <ChatWindow 
         isOpen={isChatOpen}
         onClose={handleChatClose}
+        initialQuery={initialQuery}
+        onSearchComplete={handleChatSearchComplete}
       />
     </div>
   );

@@ -2,6 +2,111 @@
 
 All notable changes to the Homiq project.
 
+# Changelog
+
+All notable changes to HOUSE.AI will be documented in this file.
+
+## [4.0.0] - 2025-10-18
+
+### 🎉 Major Features
+
+#### Dynamic Widget System
+- **Auto-sizing widgets** based on content length (1x1 to 2x3 grid units)
+- **Smart icon selection** - Automatically chooses appropriate Lucide icons based on content
+- **Centered layout** - All widgets centered on canvas for better UX
+- **Progressive loading** - Widgets appear one-by-one with visual feedback
+
+#### Advanced Citation System
+- **Clickable citations** - [1], [2] references render as styled badges
+- **Source linking** - Direct links to referenced sources
+- **Citation extraction** - Automatic parsing from Perplexity responses
+- **Badge styling** - Blue pills with hover effects
+
+#### Intelligent Follow-Up Queries
+- **Context awareness** - Detects follow-up vs initial queries
+- **Single query mode** - Follow-ups run one focused query (not 5 parallel)
+- **Widget appending** - New widgets add to canvas instead of replacing
+- **Faster responses** - 5-10s for follow-ups vs 15-20s for initial
+
+#### Enhanced Chat Interface
+- **Gemini-inspired animations** - Gradient orb "Thinking" indicator
+- **Loading states** - Transparent visual cues without blocking messages
+- **Follow-up detection** - Smart handling of conversation context
+- **Success messaging** - Clear feedback on widget creation
+
+#### Visual Improvements
+- **Loading overlay** - Translucent grey canvas with "Generating..." text
+- **Progress indication** - Spinner + pulse animation
+- **Markdown rendering** - Headers, bold, lists, citations all styled
+- **Header formatting** - H1/H2/H3 with proper sizing and weight
+
+### 🔧 Technical Improvements
+- Added `react-markdown` and `remark-gfm` for markdown support
+- Implemented dynamic layout algorithm with centering
+- Added `getSmartIcon()` helper for content-based icon selection
+- Expanded icon library (CloudRain, Building, TrendingUp, Trees, Heart, etc.)
+- Enhanced API route with `isFollowUp` flag support
+- Improved widget size calculation algorithm
+- Added citation data structure to API responses
+
+### 🐛 Bug Fixes
+- Fixed markdown rendering showing raw asterisks (**text** → **text**)
+- Fixed widget layout not updating with API data
+- Corrected dynamic sizing not being applied
+- Fixed follow-up queries replacing instead of appending widgets
+
+### 📚 Documentation
+- Consolidated docs into 5 main files (README, CHANGELOG, SETUP_AND_TESTING, MAJOR_UPDATE_V4, Report)
+- Removed redundant docs (mario.md, CONSOLE_TEST.md, old SETUP.md, TEST_PLAN.md)
+- Updated README.md for GitHub with comprehensive feature overview
+- Created unified SETUP_AND_TESTING.md guide
+
+---
+
+## [3.11.0] - 2025-10-18 - Backend Integration Implementation
+
+### Added
+🔗 **Pure Next.js Backend Integration**
+- **Complete Migration**: Moved from Python (`test_3.py`) to pure TypeScript implementation
+- **API Route**: Full backend logic in `/src/app/api/search/route.ts`
+  - `generateSubPrompts()`: Converts user queries into 3 research questions + rental + weather prompts
+  - `executeSingleQuery()`: Executes individual Perplexity API calls with rate limiting
+  - `runQueriesInParallel()`: Parallel execution with 2-second delays between requests
+  - `buildUiPayload()`: Transforms results into widget-compatible JSON structure
+- **Error Handling**: Comprehensive error handling and logging for API failures
+- **Type Safety**: Full TypeScript interfaces for API requests/responses
+- **Content Processing**: Smart handling of Perplexity API response formats (string/array)
+
+🎯 **Two-Path User Journey**
+- **Search Path**: Homepage search → GridPage with query → Chat opens with user question
+- **Explore Path**: "Get Started" → GridPage with welcome chat → Assistant greeting
+- **URL Parameters**: `?q=query` for search, `?welcome=true` for explore mode
+- **Auto Chat**: Chat automatically opens based on entry method
+
+🎨 **UI/UX Improvements**
+- **Square Canvas**: Reduced canvas from 4000x3000px to 2000x2000px (more readable)
+- **Default View**: Centered view with 0.6x zoom, positioned at (-200, -100) for optimal widget visibility
+- **Search Bar**: Added floating search bar on GridPage for continued searching
+- **Chat Integration**: 
+  - Shows user query first when coming from homepage search
+  - Shows loading indicator during Perplexity research
+  - Welcome message for "Get Started" users
+  - Auto-opens based on entry context
+
+### Technical Details
+- **Single Language Stack**: Pure TypeScript/Next.js (Python `test_3.py` kept for reference only)
+- **Perplexity Models**: Using `sonar` for prompt generation, `sonar-pro` for research
+- **Rate Limiting**: 2-second delays between parallel API calls to respect limits
+- **JSON Schema**: Structured widget output matching existing UI components
+- **Property Extraction**: Smart parsing of rental listings with URL detection
+- **Environment**: `.env.local` file setup with `PERPLEXITY_API_KEY`
+- **Canvas Optimization**: Smaller grid for better text readability and performance
+
+### Deployment
+- **Single Service**: Pure Vercel deployment (no external services required)
+- **Zero Dependencies**: No Python runtime or external APIs needed
+- **Production Ready**: All code in TypeScript with proper error handling
+
 ## [v3.10] - 2025-01-XX - Performance Optimization & Responsive Design
 
 ### Changed

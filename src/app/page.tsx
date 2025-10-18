@@ -118,7 +118,7 @@ export default function Home() {
         </div>
 
         {/* CTA */}
-        <Link href="/housing">
+        <Link href="/housing?welcome=true">
           <Button className="bg-green-800 hover:bg-green-900 text-white px-8 py-4 text-lg rounded-xl font-medium shadow-lg">
             Get Started →
           </Button>

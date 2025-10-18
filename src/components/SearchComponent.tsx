@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,37 +14,16 @@ interface SearchResult {
 
 export default function SearchComponent() {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const router = useRouter();
 
   const handleSearch = async () => {
     if (!query.trim()) return;
 
     setLoading(true);
-    setError('');
     
-    try {
-      const response = await fetch('/api/search', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ query }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Search failed');
-      }
-
-      const data = await response.json();
-      setResults(data.results);
-    } catch (err) {
-      setError('Failed to search. Please try again.');
-      console.error('Search error:', err);
-    } finally {
-      setLoading(false);
-    }
+    // Navigate to housing page with query parameter
+    router.push(`/housing?q=${encodeURIComponent(query)}`);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -112,50 +92,6 @@ export default function SearchComponent() {
           ))}
         </div>
       </div>
-
-      {/* Results Section */}
-      {(results.length > 0 || loading || error) && (
-        <div className="max-w-4xl mx-auto px-6 pb-12">
-          <div className="space-y-4">
-            {error && (
-              <div className="text-red-400 text-center p-6 bg-red-500/10 backdrop-blur-sm rounded-2xl border border-red-500/20">
-                {error}
-              </div>
-            )}
-
-            {results.map((result, index) => (
-              <Card key={index} className="bg-white/10 backdrop-blur-sm border-white/20 hover:bg-white/15 transition-all duration-300 shadow-xl">
-                <CardHeader>
-                  <CardTitle className="text-lg">
-                    <a 
-                      href={result.url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-cyan-400 hover:text-cyan-300 hover:underline"
-                    >
-                      {result.title}
-                    </a>
-                  </CardTitle>
-                  <CardDescription className="text-sm text-emerald-400">
-                    {result.url}
-                  </CardDescription>
-                </CardHeader>
-                {result.snippet && (
-                  <CardContent>
-                    <p className="text-slate-300">{result.snippet}</p>
-                  </CardContent>
-                )}
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {results.length === 0 && !loading && !error && query.trim() && (
-        <div className="text-center text-slate-400 py-12">
-          No results found. Try a different search query.
-        </div>
-      )}
     </div>
   );
 }

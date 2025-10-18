@@ -12,16 +12,57 @@ interface Message {
 interface ChatWindowProps {
   isOpen: boolean;
   onClose: () => void;
+  initialQuery?: string;
+  onSearchComplete?: (widgets: any[]) => void; // Callback to update parent with new widgets
 }
 
-export default function ChatWindow({ isOpen, onClose }: ChatWindowProps) {
+export default function ChatWindow({ isOpen, onClose, initialQuery, onSearchComplete }: ChatWindowProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [hasInitialized, setHasInitialized] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Initialize chat based on context
+  useEffect(() => {
+    if (isOpen && !hasInitialized) {
+      setHasInitialized(true);
+      
+      if (initialQuery) {
+        // User came from homepage with a query - this is handled by GridPage's handleSearch
+        // Just show the loading state, GridPage will trigger the API call
+        const userMessage: Message = {
+          id: Date.now().toString(),
+          role: 'user',
+          content: initialQuery,
+          timestamp: new Date(),
+        };
+        
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: '🔍 I\'m analyzing your query and researching with Perplexity AI. This may take a moment as I gather comprehensive information...',
+          timestamp: new Date(),
+        };
+        
+        setMessages([userMessage, assistantMessage]);
+        // Note: GridPage's handleSearch will update the widgets, 
+        // and we'll show completion when that's done
+      } else {
+        // User clicked "Get Started" - show welcome message
+        const welcomeMessage: Message = {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: '👋 Hey! How can I help you find the perfect place to live? You can ask me about neighborhoods, housing prices, safety, amenities, or anything else about living in a specific area.',
+          timestamp: new Date(),
+        };
+        setMessages([welcomeMessage]);
+      }
+    }
+  }, [isOpen, initialQuery, hasInitialized]);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -49,23 +90,63 @@ export default function ChatWindow({ isOpen, onClose }: ChatWindowProps) {
       timestamp: new Date(),
     };
 
+    const queryText = input;
+    const isFollowUpQuery = messages.length > 1; // More than just welcome message
+    
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setSelectedFile(null);
     setIsLoading(true);
 
-    // TODO: Implement actual AI response
-    setTimeout(() => {
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
+    try {
+      // Call the actual API with follow-up flag
+      const response = await fetch('/api/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          query: queryText,
+          isFollowUp: isFollowUpQuery 
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Search failed: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('Chat search results:', data);
+
+      // Update widgets via callback
+      if (onSearchComplete && data.widgets) {
+        onSearchComplete(data.widgets);
+      }
+
+      // Show success message
+      const successMessage: Message = {
+        id: (Date.now() + 2).toString(),
         role: 'assistant',
-        content: 'I understand your question. Let me analyze the data and provide you with insights...',
+        content: data.is_followup 
+          ? `✅ I've added 1 new widget about "${data.widgets[0]?.title}" to your canvas! You can see the details there.`
+          : `✅ I've updated the canvas with ${data.widget_count || 0} widgets based on my research! You can explore: ${data.widgets?.map((w: any) => w.title).join(', ')}. Feel free to ask follow-up questions!`,
         timestamp: new Date(),
       };
-      setMessages(prev => [...prev, assistantMessage]);
+      setMessages(prev => [...prev, successMessage]);
+    } catch (error) {
+      console.error('Chat search error:', error);
+      // Show error message
+      const errorMessage: Message = {
+        id: (Date.now() + 2).toString(),
+        role: 'assistant',
+        content: '❌ Sorry, I encountered an error while researching. Please try again.',
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
       setIsLoading(false);
-    }, 1000);
-  }, [input, selectedFile]);
+    }
+  }, [input, selectedFile, onSearchComplete, messages.length]);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -144,13 +225,16 @@ export default function ChatWindow({ isOpen, onClose }: ChatWindowProps) {
               </div>
             ))}
             {isLoading && (
-              <div className="flex justify-start">
-                <div className="bg-gray-100 rounded-2xl px-4 py-3">
+              <div className="flex justify-start items-center gap-2 mb-2">
+                {/* Gemini-inspired thinking indicator */}
+                <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-50 to-purple-50 rounded-full border border-blue-100/50 shadow-sm">
+                  {/* Animated gradient orbs */}
                   <div className="flex gap-1">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                    <div className="w-2 h-2 rounded-full bg-gradient-to-r from-blue-400 to-purple-400 animate-pulse" style={{ animationDuration: '1s', animationDelay: '0ms' }}></div>
+                    <div className="w-2 h-2 rounded-full bg-gradient-to-r from-purple-400 to-pink-400 animate-pulse" style={{ animationDuration: '1s', animationDelay: '200ms' }}></div>
+                    <div className="w-2 h-2 rounded-full bg-gradient-to-r from-pink-400 to-blue-400 animate-pulse" style={{ animationDuration: '1s', animationDelay: '400ms' }}></div>
                   </div>
+                  <span className="text-xs font-medium text-gray-600 animate-pulse">Thinking</span>
                 </div>
               </div>
             )}
