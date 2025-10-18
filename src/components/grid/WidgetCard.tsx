@@ -88,21 +88,25 @@ export const WidgetCard = React.memo<WidgetCardProps>(({
           {widget.content}
         </div>
 
-        {/* Widget Footer - Sources */}
-        <div className="no-drag border-t border-gray-100 px-4 py-1.5 flex items-center gap-2 bg-gray-50/50 flex-shrink-0">
-          <div className="flex gap-1.5">
-            {widget.sources.map((source) => (
-              <div
-                key={source.id}
-                className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: source.color }}
-                title={source.name}
-              />
-            ))}
-          </div>
-          <span className="text-[10px] text-gray-500">
-            {widget.sources.length} {widget.sources.length === 1 ? 'source' : 'sources'}
-          </span>
+        {/* Widget Footer - Sources/Citations with clickable links */}
+        <div className="no-drag border-t border-gray-100 px-4 py-2 bg-gray-50/50 flex-shrink-0">
+          {widget.sources && widget.sources.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[10px] text-gray-600 font-medium">Sources:</span>
+              {widget.sources.map((source, index) => (
+                <a
+                  key={`${source.id}-${index}`}
+                  href={source.url || '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 px-2 py-1 rounded no-underline font-medium transition-colors"
+                  title={source.name || `Source ${source.id}`}
+                >
+                  [{source.id || index + 1}]
+                </a>
+              ))}
+            </div>
+          )}
         </div>
       </Card>
     </div>

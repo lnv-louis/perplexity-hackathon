@@ -111,9 +111,13 @@ const GridPage: React.FC = () => {
   }, [initialQuery, hasSearched, handleSearch]);
 
   const handleDelete = useCallback((widgetId: string) => {
-    setActiveWidgets(prev => prev.filter(id => id !== widgetId));
-    if (selectedWidget === widgetId) {
-      setSelectedWidget(null);
+    // Show confirmation dialog
+    if (window.confirm('Are you sure you want to delete this widget?')) {
+      setActiveWidgets(prev => prev.filter(id => id !== widgetId));
+      setApiWidgets(prev => prev.filter(w => w.id !== widgetId));
+      if (selectedWidget === widgetId) {
+        setSelectedWidget(null);
+      }
     }
   }, [selectedWidget]);
 
@@ -337,41 +341,45 @@ const GridPage: React.FC = () => {
       
       return {
         id,
-        size: apiWidget?.size || { w: 3, h: 2 }, // Use API size or default
+        size: apiWidget?.size || { w: 2, h: 3 }, // Larger default size to show more content
         content: staticWidget?.content
       };
     });
     
-    // Calculate total width needed to center widgets
+    // Calculate total width needed for bento-style grid (multiple columns)
     const totalCols = 12;
-    const widgetWidthSum = activeWidgetData.reduce((sum, w) => sum + w.size.w, 0);
-    const startXOffset = Math.max(0, Math.floor((totalCols - widgetWidthSum) / 2));
     
-    // Start from centered position
-    let xPosLg = startXOffset;
+    // Bento-style layout: 2-3 widgets per row for better content visibility
+    let xPosLg = 0;
     let yPosLg = 0;
+    let currentRowHeight = 0;
     let xPosMd = 0;
     let yPosMd = 0;
     let yPosSm = 0;
     
     activeWidgetData.forEach((widgetData) => {
+      // Use API sizes directly (already calculated for content length)
       const height = widgetData.size.h * 2; // Convert to grid units
-      const width = widgetData.size.w * 3;   // Convert to grid units
+      const width = widgetData.size.w * 2;   // Convert to grid units
       
-      // Large layout - centered
+      // Large layout - bento grid style (2-3 columns for readability)
       if (xPosLg + width > totalCols) {
-        xPosLg = startXOffset;
-        yPosLg += height;
+        xPosLg = 0;
+        yPosLg += currentRowHeight;
+        currentRowHeight = 0;
       }
+      
       lg.push({
         i: widgetData.id,
         x: xPosLg,
         y: yPosLg,
         w: width,
         h: height,
-        minW: 3,
-        minH: 2,
+        minW: 4,
+        minH: 6,
       });
+      
+      currentRowHeight = Math.max(currentRowHeight, height);
       xPosLg += width;
       
       // Medium layout
@@ -487,26 +495,30 @@ const GridPage: React.FC = () => {
               onReset={() => handleZoomReset(resetTransform)}
             />
 
-            {/* Canvas content */}
+            {/* Canvas content with full viewport dotted grid */}
             <TransformComponent wrapperClass="!w-screen !h-screen">
               <div 
-                className="p-6 min-h-[2000px] min-w-[2000px] canvas-background relative"
+                className="p-6 min-h-screen min-w-screen w-[200vw] h-[200vh] canvas-background relative"
                 onClick={handleCanvasClick}
+                style={{
+                  backgroundImage: 'radial-gradient(circle, rgba(156, 163, 175, 0.3) 1px, transparent 1px)',
+                  backgroundSize: '24px 24px'
+                }}
               >
-                {/* Loading Overlay */}
+                {/* Loading Overlay with larger, more visible text */}
                 {isSearching && (
-                  <div className="absolute inset-0 bg-gray-900/30 backdrop-blur-[2px] z-50 flex items-center justify-center">
+                  <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-50 flex items-center justify-center">
                     <div className="text-center">
-                      <div className="relative">
+                      <div className="relative mb-8">
                         {/* Animated spinner */}
-                        <div className="w-16 h-16 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
+                        <div className="w-24 h-24 border-8 border-white/20 border-t-white rounded-full animate-spin mx-auto"></div>
                         {/* Pulse ring */}
-                        <div className="absolute inset-0 w-16 h-16 border-4 border-white/10 rounded-full animate-ping mx-auto"></div>
+                        <div className="absolute inset-0 w-24 h-24 border-8 border-white/10 rounded-full animate-ping mx-auto"></div>
                       </div>
-                      <p className="text-white text-xl font-semibold tracking-wide animate-pulse">
+                      <p className="text-white text-5xl font-bold tracking-wide mb-4 animate-pulse">
                         Generating...
                       </p>
-                      <p className="text-white/70 text-sm mt-2">
+                      <p className="text-white/90 text-xl mt-4 max-w-md mx-auto">
                         Researching your query with Perplexity AI
                       </p>
                     </div>
@@ -568,6 +580,8 @@ const GridPage: React.FC = () => {
         onClose={handleChatClose}
         initialQuery={initialQuery}
         onSearchComplete={handleChatSearchComplete}
+        existingWidgets={apiWidgets}
+        isSearching={isSearching}
       />
     </div>
   );

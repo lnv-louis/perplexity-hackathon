@@ -7,6 +7,11 @@ interface SubPrompt {
   citations?: Array<{ number: number; url: string; title: string }>;
 }
 
+interface QueryResult {
+  content: string;
+  citations: Array<{ number: number; url: string; title: string }>;
+}
+
 interface WidgetData {
   id: string;
   title: string;
@@ -23,20 +28,33 @@ interface SearchResponse {
   is_followup?: boolean; // Flag for follow-up queries
 }
 
-async function generateSubPrompts(initialPrompt: string): Promise<string[]> {
+interface ConversationMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
+// Get system prompt from env or use default
+const SYSTEM_PROMPT = process.env.PERPLEXITY_SYSTEM_PROMPT || 
+  "You are a real estate research assistant providing concise, accurate information about housing and neighborhoods. Format responses with proper markdown including headers (use ### for main sections), bullet points, and numbered lists. Include relevant citations [1][2] after factual statements. Keep answers focused and under 400 words unless detailed analysis is requested. Always include complete words - never truncate (e.g., write 'area' not 'are'). Structure responses clearly with sections for key information.";
+
+const PROMPT_SUFFIX = process.env.PERPLEXITY_PROMPT_SUFFIX || 
+  " Provide a well-structured response with markdown formatting. Use ### headers for main sections. Include citations [1][2] for all facts. Write complete sentences without truncation. Keep the response concise (300-400 words) but comprehensive.";
+
+async function generateSubPrompts(initialPrompt: string, conversationHistory: ConversationMessage[] = []): Promise<string[]> {
   try {
     const client = new Perplexity({
       apiKey: process.env.PERPLEXITY_API_KEY,
     });
 
-    const messages = [
+    const messages: ConversationMessage[] = [
       {
-        role: "system" as const,
-        content: "You are an AI assistant that breaks down a user's broad real estate query into exactly 3 specific, researchable questions. Return them as a numbered list.",
+        role: "system",
+        content: "You are an AI assistant that breaks down a user's broad real estate query into exactly 3 specific, researchable questions. Return them as a numbered list. Consider the conversation context to avoid duplicate questions.",
       },
+      ...conversationHistory.slice(-4), // Include last 2 exchanges for context
       {
-        role: "user" as const,
-        content: `Based on the user's query: '${initialPrompt}', generate 3 distinct questions a real estate analyst should investigate. Cover broad topics like safety/crime rates, local amenities (schools, parks), and lifestyle/atmosphere.`,
+        role: "user",
+        content: `Based on the user's query: '${initialPrompt}', generate 3 distinct questions a real estate analyst should investigate. Cover broad topics like safety/crime rates, local amenities (schools, parks), and lifestyle/atmosphere. Avoid topics already covered in previous questions.`,
       },
     ];
 
@@ -75,18 +93,26 @@ async function generateSubPrompts(initialPrompt: string): Promise<string[]> {
   }
 }
 
-async function executeSingleQuery(prompt: string): Promise<string> {
+async function executeSingleQuery(prompt: string, conversationHistory: ConversationMessage[] = []): Promise<QueryResult> {
   try {
     const client = new Perplexity({
       apiKey: process.env.PERPLEXITY_API_KEY,
     });
 
-    const systemPrompt = {
-      role: "system" as const,
-      content: "You are an expert AI real estate analyst. Your answer should be a concise summary, limited to a maximum of 3-4 sentences or a short bulleted list. Get straight to the point. Include citations as [1], [2], etc."
-    };
-    
-    const messages = [systemPrompt, { role: "user" as const, content: prompt }];
+    // Add prompt suffix for better formatting
+    const enhancedPrompt = prompt + PROMPT_SUFFIX;
+
+    const messages: ConversationMessage[] = [
+      {
+        role: "system",
+        content: SYSTEM_PROMPT
+      },
+      ...conversationHistory.slice(-6), // Include last 3 exchanges for context
+      {
+        role: "user",
+        content: enhancedPrompt
+      }
+    ];
 
     const completion = await client.chat.completions.create({
       model: "sonar-pro",
@@ -101,24 +127,58 @@ async function executeSingleQuery(prompt: string): Promise<string> {
         'text' in chunk ? chunk.text : ''
       ).join('') : '';
     
-    return contentString;
+    // Extract citations from API response - Perplexity includes citations in the response
+    const citations: Array<{ number: number; url: string; title: string }> = [];
+    
+    // Check if response has citations field
+    if ((completion as any).citations && Array.isArray((completion as any).citations)) {
+      const apiCitations = (completion as any).citations;
+      apiCitations.forEach((cite: string, index: number) => {
+        citations.push({
+          number: index + 1,
+          url: cite,
+          title: `Source ${index + 1}`
+        });
+      });
+    } else {
+      // Fallback: try to extract URLs from content using regex
+      const urlPattern = /https?:\/\/[^\s\)]+/g;
+      const urls = contentString.match(urlPattern) || [];
+      urls.slice(0, 10).forEach((url, index) => {
+        citations.push({
+          number: index + 1,
+          url: url,
+          title: `Source ${index + 1}`
+        });
+      });
+    }
+    
+    console.log(`Extracted ${citations.length} citations from API response`);
+    
+    return {
+      content: contentString,
+      citations
+    };
   } catch (error) {
     const errorMessage = `An error occurred for prompt '${prompt}': ${error}`;
     console.error(errorMessage);
-    return errorMessage;
+    return {
+      content: errorMessage,
+      citations: []
+    };
   }
 }
 
-// Helper: Calculate dynamic widget size based on content length
+// Helper: Calculate dynamic widget size based on content length (larger sizes to show more content)
 function calculateWidgetSize(content: string): { w: number; h: number } {
   const length = content.length;
   
-  // Base size is 1x1 (300x200px in grid units)
-  // Increase height based on content length
-  if (length < 200) return { w: 1, h: 1 }; // Small content
-  if (length < 400) return { w: 1, h: 2 }; // Medium content
-  if (length < 800) return { w: 2, h: 2 }; // Large content
-  return { w: 2, h: 3 }; // Very large content
+  // Larger sizes to display more content before opening widget
+  // w: width units (2-3), h: height units (3-4)
+  if (length < 400) return { w: 2, h: 3 }; // Small content
+  if (length < 800) return { w: 2, h: 4 }; // Medium content - taller
+  if (length < 1200) return { w: 3, h: 4 }; // Large content - wider and taller
+  return { w: 3, h: 5 }; // Very large content - maximum size for readability
 }
 
 // Helper: Extract citations from content
@@ -141,7 +201,7 @@ function extractCitations(content: string): Array<{ number: number; url: string;
   return citations;
 }
 
-async function runQueriesInParallel(prompts: string[]): Promise<SubPrompt[]> {
+async function runQueriesInParallel(prompts: string[], conversationHistory: ConversationMessage[] = []): Promise<SubPrompt[]> {
   if (!prompts.length) return [];
 
   try {
@@ -149,8 +209,12 @@ async function runQueriesInParallel(prompts: string[]): Promise<SubPrompt[]> {
     const delayedPromises = prompts.map((prompt, index) => 
       new Promise<SubPrompt>((resolve) => {
         setTimeout(async () => {
-          const answer = await executeSingleQuery(prompt);
-          resolve({ question: prompt, answer });
+          const result = await executeSingleQuery(prompt, conversationHistory);
+          resolve({ 
+            question: prompt, 
+            answer: result.content,
+            citations: result.citations
+          });
         }, index * 2000); // 2 second delay between each
       })
     );
@@ -239,7 +303,10 @@ function buildUiPayload(results: SubPrompt[]): SearchResponse {
     const title = extractTitleFromQuestion(result.question);
     const contentStr = typeof result.answer === 'string' ? result.answer : JSON.stringify(result.answer);
     const size = calculateWidgetSize(contentStr);
-    const citations = extractCitations(contentStr);
+    // Use citations from query result if available, otherwise extract from content
+    const citations = (result.citations && result.citations.length > 0) 
+      ? result.citations 
+      : extractCitations(contentStr);
     
     if (widgetId === 'locations') {
       mapped.push({
@@ -249,7 +316,7 @@ function buildUiPayload(results: SubPrompt[]): SearchResponse {
           properties,
           last_updated: new Date().toISOString()
         },
-        size: { w: 2, h: 2 }, // Properties widget is always larger
+        size: { w: 3, h: 4 }, // Properties widget is larger to show more content
         citations: []
       });
     } else if (widgetId) {
@@ -273,7 +340,7 @@ function buildUiPayload(results: SubPrompt[]): SearchResponse {
 
 export async function POST(request: NextRequest) {
   try {
-    const { query, isFollowUp, existingWidgets } = await request.json();
+    const { query, isFollowUp, existingWidgets = [], conversationHistory = [] } = await request.json();
 
     if (!query) {
       return NextResponse.json(
@@ -284,27 +351,41 @@ export async function POST(request: NextRequest) {
 
     console.log('Processing housing search query:', query);
     console.log('Is follow-up?', isFollowUp);
+    console.log('Existing widgets:', existingWidgets.length);
+    console.log('Conversation history length:', conversationHistory.length);
 
     if (isFollowUp) {
-      // Handle follow-up query - single focused query, not parallel
-      console.log('Running single follow-up query...');
-      const answer = await executeSingleQuery(query);
+      // Handle follow-up query - single focused query with conversation context
+      console.log('Running single follow-up query with RAG memory...');
+      const result = await executeSingleQuery(query, conversationHistory);
       
       // Generate a unique widget ID
       const newWidgetId = `widget-${Date.now()}`;
-      const title = extractTitleFromQuestion(query);
-      const size = calculateWidgetSize(answer);
-      const citations = extractCitations(answer);
+      
+      // Extract title and ensure it's unique
+      let title = extractTitleFromQuestion(query);
+      const existingTitles = existingWidgets.map((w: any) => w.title.toLowerCase());
+      let titleSuffix = 1;
+      let uniqueTitle = title;
+      
+      // Prevent duplicate titles
+      while (existingTitles.includes(uniqueTitle.toLowerCase())) {
+        uniqueTitle = `${title} ${titleSuffix}`;
+        titleSuffix++;
+      }
+      
+      const size = calculateWidgetSize(result.content);
+      const citations = result.citations.length > 0 ? result.citations : extractCitations(result.content);
       
       const newWidget: WidgetData = {
         id: newWidgetId,
-        title,
-        content: answer,
+        title: uniqueTitle,
+        content: result.content,
         size,
         citations
       };
       
-      console.log('Follow-up query completed, returning 1 new widget');
+      console.log('Follow-up query completed, returning 1 new widget:', uniqueTitle);
       
       return NextResponse.json({
         generated_at: new Date().toISOString(),
@@ -316,8 +397,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Original flow: Initial search with parallel queries
-    // Step 1: Generate sub-prompts
-    const prompts = await generateSubPrompts(query);
+    // Step 1: Generate sub-prompts with conversation context
+    const prompts = await generateSubPrompts(query, conversationHistory);
     if (!prompts.length) {
       return NextResponse.json(
         { error: 'Failed to generate research questions' },
@@ -327,8 +408,8 @@ export async function POST(request: NextRequest) {
 
     console.log('Generated prompts:', prompts.length);
 
-    // Step 2: Run parallel queries
-    const results = await runQueriesInParallel(prompts);
+    // Step 2: Run parallel queries with conversation context
+    const results = await runQueriesInParallel(prompts, conversationHistory);
     
     // Step 3: Build UI payload
     const payload = buildUiPayload(results);

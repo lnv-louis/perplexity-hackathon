@@ -14,14 +14,17 @@ interface ChatWindowProps {
   onClose: () => void;
   initialQuery?: string;
   onSearchComplete?: (widgets: any[]) => void; // Callback to update parent with new widgets
+  existingWidgets?: any[]; // Pass existing widgets to prevent duplicates
+  isSearching?: boolean; // External loading state from GridPage
 }
 
-export default function ChatWindow({ isOpen, onClose, initialQuery, onSearchComplete }: ChatWindowProps) {
+export default function ChatWindow({ isOpen, onClose, initialQuery, onSearchComplete, existingWidgets = [], isSearching: externalSearching }: ChatWindowProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [hasInitialized, setHasInitialized] = useState(false);
+  const [initialSearchCompleted, setInitialSearchCompleted] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -32,8 +35,7 @@ export default function ChatWindow({ isOpen, onClose, initialQuery, onSearchComp
       setHasInitialized(true);
       
       if (initialQuery) {
-        // User came from homepage with a query - this is handled by GridPage's handleSearch
-        // Just show the loading state, GridPage will trigger the API call
+        // User came from homepage with a query - show thinking state immediately
         const userMessage: Message = {
           id: Date.now().toString(),
           role: 'user',
@@ -41,16 +43,9 @@ export default function ChatWindow({ isOpen, onClose, initialQuery, onSearchComp
           timestamp: new Date(),
         };
         
-        const assistantMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: '🔍 I\'m analyzing your query and researching with Perplexity AI. This may take a moment as I gather comprehensive information...',
-          timestamp: new Date(),
-        };
-        
-        setMessages([userMessage, assistantMessage]);
-        // Note: GridPage's handleSearch will update the widgets, 
-        // and we'll show completion when that's done
+        setMessages([userMessage]);
+        setIsLoading(true); // Show thinking animation right away
+        // Note: GridPage's handleSearch will update the widgets
       } else {
         // User clicked "Get Started" - show welcome message
         const welcomeMessage: Message = {
@@ -79,6 +74,23 @@ export default function ChatWindow({ isOpen, onClose, initialQuery, onSearchComp
     }
   }, [input]);
 
+  // Handle external search completion (from GridPage initial search)
+  useEffect(() => {
+    if (initialQuery && !initialSearchCompleted && !externalSearching && existingWidgets.length > 0) {
+      setInitialSearchCompleted(true);
+      setIsLoading(false);
+      
+      // Add success message
+      const successMessage: Message = {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: `✅ I've created ${existingWidgets.length} widgets based on my research! You can explore them on the canvas. Feel free to ask follow-up questions!`,
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, successMessage]);
+    }
+  }, [initialQuery, initialSearchCompleted, externalSearching, existingWidgets.length]);
+
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() && !selectedFile) return;
@@ -99,7 +111,25 @@ export default function ChatWindow({ isOpen, onClose, initialQuery, onSearchComp
     setIsLoading(true);
 
     try {
-      // Call the actual API with follow-up flag
+      // Build conversation history for RAG - filter to ensure alternating user/assistant messages
+      const filteredMessages = messages.slice(-6).filter(msg => {
+        // Exclude system messages and success messages
+        return !msg.content.includes('✅') && !msg.content.includes('👋');
+      });
+      
+      // Ensure alternating pattern: remove consecutive messages from same role
+      const conversationHistory: Array<{role: 'user' | 'assistant', content: string}> = [];
+      let lastRole: 'user' | 'assistant' | null = null;
+      
+      for (const msg of filteredMessages) {
+        const role = msg.role === 'user' ? 'user' as const : 'assistant' as const;
+        if (role !== lastRole) {
+          conversationHistory.push({ role, content: msg.content });
+          lastRole = role;
+        }
+      }
+
+      // Call the actual API with follow-up flag, conversation history, and existing widgets
       const response = await fetch('/api/search', {
         method: 'POST',
         headers: {
@@ -107,7 +137,9 @@ export default function ChatWindow({ isOpen, onClose, initialQuery, onSearchComp
         },
         body: JSON.stringify({ 
           query: queryText,
-          isFollowUp: isFollowUpQuery 
+          isFollowUp: isFollowUpQuery,
+          conversationHistory,
+          existingWidgets: existingWidgets || []
         }),
       });
 
@@ -146,7 +178,7 @@ export default function ChatWindow({ isOpen, onClose, initialQuery, onSearchComp
     } finally {
       setIsLoading(false);
     }
-  }, [input, selectedFile, onSearchComplete, messages.length]);
+  }, [input, selectedFile, onSearchComplete, messages, existingWidgets]);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -224,7 +256,7 @@ export default function ChatWindow({ isOpen, onClose, initialQuery, onSearchComp
                 </div>
               </div>
             ))}
-            {isLoading && (
+            {(isLoading || externalSearching) && (
               <div className="flex justify-start items-center gap-2 mb-2">
                 {/* Gemini-inspired thinking indicator */}
                 <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-50 to-purple-50 rounded-full border border-blue-100/50 shadow-sm">

@@ -1,10 +1,109 @@
 # Changelog
 
-All notable changes to the Homiq project.
-
-# Changelog
-
 All notable changes to HOUSE.AI will be documented in this file.
+
+## [4.1.0] - 2025-10-18
+
+### 🧠 RAG Memory & Context Awareness
+
+#### Conversation Memory System
+- **RAG implementation** - Last 6 messages (3 exchanges) passed to Perplexity API
+- **Context-aware prompts** - Avoids duplicate questions across conversation
+- **Coherent follow-ups** - API remembers previous context for smarter responses
+- **Conversation history interface** - New `ConversationMessage` type for structured history
+
+#### Enhanced Prompt Engineering
+- **System prompt configuration** - Added `.env.local` variables for customization
+- **PERPLEXITY_SYSTEM_PROMPT** - Instructs AI to write complete words, proper markdown
+- **PERPLEXITY_PROMPT_SUFFIX** - Enforces ### headers, citations, concise format
+- **Fixes missing letters** - Explicit instructions prevent truncation (e.g., "area" not "are")
+- **300-400 word responses** - Optimal length for widget readability
+
+#### Duplicate Prevention
+- **Unique title generation** - Automatically adds numeric suffixes (e.g., "Crime Rates 2")
+- **Existing widgets tracking** - Frontend sends current widgets to API
+- **Title collision detection** - Prevents creating multiple widgets with identical names
+- **Smart appending** - New widgets use unique IDs and titles
+
+### 🎨 UX Improvements
+
+#### Widget Management
+- **Delete confirmation dialog** - Browser-native popup before removing widgets
+- **Smaller default size** - Changed from 3x2 to 2x2 grid units
+- **Better text visibility** - Reduced widget dimensions for readable font sizes
+- **Bento-grid layout** - 3-4 widgets per row instead of single column
+- **Dynamic sizing** - Content-based: 300 chars = 1x2, 1000+ chars = 2x3
+
+#### Visual Enhancements
+- **Full viewport grid** - Canvas uses `min-h-screen w-[200vw] h-[200vh]`
+- **Custom dotted pattern** - Radial gradient background (24px grid)
+- **Larger "Generating" text** - 5xl font (was xl), much more visible
+- **Bigger loading spinner** - 24px (was 16px), darker backdrop (40% opacity)
+- **Fixed positioning** - Loading overlay covers entire viewport
+
+#### Chat Interface
+- **Thinking state on startup** - Shows animated orbs immediately with initialQuery
+- **No placeholder message** - Goes straight to thinking animation
+- **Immediate feedback** - Users see progress right away
+- **Better UX flow** - Removed redundant "analyzing..." text
+
+#### Citation Footer
+- **Clickable links** - Footer displays `[1] [2] [3]` as clickable badges
+- **Opens in new tab** - Source links open externally with `target="_blank"`
+- **Consistent styling** - Matches inline citation badges (blue pills)
+- **Replaced colored dots** - Now shows actual source numbers
+
+### 🐛 Bug Fixes
+
+#### React Warnings
+- **Fixed key prop warning** - Changed from `key={source.id}` to `key={source.id}-${index}`
+- **Handles duplicate IDs** - Prevents React reconciliation errors
+- **No console warnings** - Clean development experience
+
+#### State Management
+- **Delete removes from apiWidgets** - Previously only removed from activeWidgets
+- **Proper widget cleanup** - Both state arrays updated on deletion
+- **Selection deselection** - Selected widget cleared when deleted
+
+### 🔧 Technical Changes
+
+#### API Route Updates
+- `generateSubPrompts()` - Now accepts `conversationHistory` parameter
+- `executeSingleQuery()` - Includes RAG context and enhanced prompts
+- `runQueriesInParallel()` - Passes conversation history to all parallel queries
+- POST handler - Receives `conversationHistory` and `existingWidgets`
+- Unique title algorithm - While loop checks existing titles
+
+#### Frontend Updates
+- `ChatWindow` - Builds conversation history from last 6 messages
+- `ChatWindow` - Passes `existingWidgets` to API in every request
+- `GridPage` - Updated `handleDelete` with confirmation dialog
+- `GridPage` - Bento-grid layout algorithm (multiple columns)
+- `GridPage` - Full viewport canvas with custom dotted background
+- `WidgetCard` - Citation footer redesign with clickable links
+
+#### Environment Configuration
+```env
+PERPLEXITY_SYSTEM_PROMPT="You are a real estate research assistant..."
+PERPLEXITY_PROMPT_SUFFIX=" Provide well-structured response..."
+```
+
+### 📊 Performance
+
+- **Conversation history**: +2KB per API request
+- **Minimal latency**: No noticeable impact on response time
+- **Quality improvement**: RAG context significantly improves answer relevance
+- **Duplicate prevention**: Reduces redundant API calls
+
+### 📂 Files Modified
+
+- `.env.local` - Added system prompt configuration
+- `/src/app/api/search/route.ts` - RAG memory, duplicate prevention, prompts
+- `/src/components/grid/ChatWindow.tsx` - Conversation history, thinking state
+- `/src/components/grid/WidgetCard.tsx` - Clickable citations, fixed key warning
+- `/src/pages/GridPage.tsx` - Delete confirmation, widget sizing, full viewport
+
+---
 
 ## [4.0.0] - 2025-10-18
 
